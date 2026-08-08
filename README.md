@@ -110,6 +110,12 @@ pitch variants and the accent and box-graphics extended sets.
   Everything here can be regenerated from the dumps; the labeled listing rebuilds with
   `m740recon -c work/nx1020.m740 AM27C256_DIP28_nx1020_ROM2_ZX32.BIN > work/rom2_labeled.asm`.
 
+## Acknowledgments
+
+Special thanks to Nikita Zimin, who first helped me locate some fonts in the binary ROM
+files back in 2024. It was that early progress and his simple C code which gave me the
+encouragement to dive deeper. Thanks Nikita!
+
 ## License
 
 [MIT](LICENSE), covering the documentation, analysis, annotations, and tooling in this
