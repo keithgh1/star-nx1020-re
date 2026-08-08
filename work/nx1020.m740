@@ -1,0 +1,52 @@
+# NX1020 firmware control file for m740recon.
+#
+# Builds the M50734 CPU program-space image (DME off):
+#   0x0000-0x3FFF  RAM            (zero-filled here)
+#   0x4000-0x7FFF  ROM1 system    (ISRs + core routines, from ROM1 file 0x4000)
+#   0x8000-0xFFFF  ROM2 firmware  (v3.2)
+#
+# Run from the work/ directory:
+#   m740recon -c nx1020.m740 > rom2_labeled.asm
+
+device M50734
+
+segment ram  0x0000 0x4000  zero
+segment sys  0x4000 0x8000  ../UPD27C1001A_DIP32_HN62321APS32_nx1020_ROM1.bin@0x4000
+segment fw   0x8000 0x10000 ../AM27C256_DIP28_nx1020_ROM2_ZX32.BIN@0x0
+
+# --- landmarks ---
+entry 0x8130 reset
+entry 0x8533 main_loop "fetch host byte; apply char rules; dispatch"
+
+# --- interrupt service routines (resident in ROM1 @ CPU 0x4000-0x7FFF) ---
+entry 0x4965 isr_timer123    "Timer1/2/3: motor micro-stepping pacing"
+entry 0x501a isr_tx_cntr_brk "TX / CNTR / BRK"
+entry 0x5046 isr_he_ve       "HE/VE: carriage column timing"
+entry 0x5057 isr_ri_int1     "RI/INT1: host receive"
+entry 0x505f isr_int2        "INT2: host reset / emergency stop"
+entry 0x64b7 get_rx_byte     "fetch next host byte from ring buffer"
+
+# --- beeper (= print-head fire) ---
+entry 0x6466 beep_tone       "tone generator: gate-array beeper reg + Timer1"
+entry 0x645c beep_wait_ready
+entry 0x63b7 beep_key        "short key/ack beep"
+entry 0x63ac beep_short
+entry 0x63c2 beep_med
+entry 0x63cd beep_long
+
+# --- dispatchers ---
+entry 0xc2c0 ctrl_lookup
+entry 0xc0bf esc_dispatch_std
+entry 0xc1bc esc_dispatch_ibm
+
+# --- control-code (C0) dispatch tables: [char, lo, hi], 0x00-terminated ---
+label 0xc063 tbl_ctrl_std
+label 0xc091 tbl_ctrl_ibm
+addrtable 0xc063 stride=3 entryoff=1 terminator=0x00 label=ctl_ names=ascii
+addrtable 0xc091 stride=3 entryoff=1 terminator=0x00 label=ctl_ibm_ names=ascii
+
+# --- ESC command dispatch tables ---
+label 0xc0d4 tbl_esc_std
+label 0xc1d8 tbl_esc_ibm
+addrtable 0xc0d4 stride=3 entryoff=1 terminator=0x00 label=cmd_esc_ names=ascii
+addrtable 0xc1d8 stride=3 entryoff=1 terminator=0x00 label=cmd_esc_ibm_ names=ascii
