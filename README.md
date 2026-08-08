@@ -17,18 +17,18 @@ operation for the printer, a mapped and labeled firmware disassembly, and an imp
 <table>
 <tr>
 <td align="center" width="50%">
-<a href="deliverables/ROM_MAP.html"><img src="assets/rom_map_preview.png" alt="Preview of the interactive ROM map"></a>
-<br><b><a href="deliverables/ROM_MAP.html">Interactive ROM map</a></b><br>
+<a href="https://keithgh1.github.io/star-nx1020-re/deliverables/ROM_MAP.html"><img src="assets/rom_map_preview.png" alt="Preview of the interactive ROM map"></a>
+<br><b><a href="https://keithgh1.github.io/star-nx1020-re/deliverables/ROM_MAP.html">Interactive ROM map</a></b><br>
 Both ROMs as clickable, color-coded columns - firmware, system code, metrics and pointer
 tables, and each font's glyph bank - with a contents sidebar and per-region detail panel.
-<i>A single self-contained HTML file: download it and open it in a browser.</i>
+<i>Opens right in the browser.</i>
 </td>
 <td align="center" width="50%">
 <a href="deliverables/FONT_CATALOG.pdf"><img src="assets/font_catalog_preview.png" alt="Preview of the resident font catalog"></a>
 <br><b><a href="deliverables/FONT_CATALOG.pdf">Resident font catalog (PDF)</a></b><br>
 Every typeface with a full glyph sheet and its metadata - the five faces plus the draft
-pitch variants and extended character sets. <i>Views directly on GitHub; also as
-<a href="deliverables/FONT_CATALOG.html">self-contained HTML</a>.</i>
+pitch variants and extended character sets. <i>Views directly on GitHub; also as a
+<a href="https://keithgh1.github.io/star-nx1020-re/deliverables/FONT_CATALOG.html">browsable HTML page</a>.</i>
 </td>
 </tr>
 </table>
