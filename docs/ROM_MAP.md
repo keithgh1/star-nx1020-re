@@ -23,7 +23,8 @@ FFF4 TX/CNTR/BRK -> 501A      FFFA RI/INT1 -> 5057
 FFF6 HE/VE       -> 5046      FFFC INT2    -> 505F
 FFF8 Timer1/2/3  -> 4965      FFFE RESET   -> 8130
 ```
-All IRQ targets are in **RAM** (0x49xx–0x50xx) → handlers are installed at init. ✅
+All IRQ targets (0x49xx–0x50xx) are in the **ROM1 system region** (CPU 0x4000–0x7FFF). ✅
+Note: 0x5057 (RI/INT1) is an unused-source error trap; 0x505F (INT2) = host /IN-PRIME reset.
 
 ### Structure (file offsets) ✅
 | file | CPU | size | kind |

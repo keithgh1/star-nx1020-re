@@ -14,21 +14,25 @@ mechanism; the few corrections it supplied are folded in and marked inline.
 - **CPU**: Mitsubishi **M50734** (740-family, 6502-derived), 64-pin, external bus, no internal
   memory. Drives ports P0–P4, three timers, a UART, and a 4-phase stepper-motor controller.
 - **ROM2 (IC6, 27256, 32 KB)** = firmware, mapped at CPU **0x8000–0xFFFF**.
-- **RAM (IC5, 32 KB SRAM)** = CPU **0x0000–0x7FFF**. Holds variables, line/print buffers,
-  the host receive ring buffer, the download-font area (0x0240), **and the relocated
-  interrupt service routines** (installed at init - see §1).
+- **RAM (IC5, 32 KB SRAM)** = CPU **0x0000–0x3FFF** (program space, DME off). Holds variables,
+  line/print buffers, the host receive ring buffer, and the download-font area (0x0240).
+  CPU **0x4000–0x7FFF** is **ROM1 system code** (the ISRs + core real-time routines live
+  there, in ROM - not copied to RAM).
 - **ROM1 (IC7, D27C1001, 128 KB)** = font + system data. It is **not** in CPU address space;
   it sits on a separate **MA0–MA16** bus behind the gate array and is read through the
   **DME** (Data Memory Enable) data window when P0.5=DME is asserted.
 - **Gate array (NEC D65006)**: memory-mapped at **0x4000–0x4003 in the DME data space**. The
   I/O hub between CPU ⇄ font ROM ⇄ **print head** (HD0–9 / HDEN). Four registers (reg0–reg3).
 - **Mechanism**: a 9-pin print head on a carriage driven by the **carriage stepper (SMCONH)**,
-  paper advanced by the **line-feed stepper (SMCONV)**, a **carriage position encoder** read on
-  **P0.7**, and sensors (paper-out, home, cover) on P0/P3 inputs.
-- **EEPROM (IC9, BR93C46)**: stores the EDS (Electronic DIP Switch) panel settings via a serial
-  interface (the exact CPU pins are unconfirmed - P3.0/1 turned out to be motor-voltage selects).
-- **Host interface**: Centronics parallel - data latched on **P1**, **STB** in, **BUSY/ACK/PE/
-  SEL/ERR** out via LS05 buffers. (A serial path exists via the UART on P0.6/0.7.)
+  paper advanced by the **line-feed stepper (SMCONV)**. Sensors: **home-position
+  photo-interrupter on P0.7** (HIGH = at home; used only by the home-seek - there is no
+  carriage encoder, sweeps are open-loop timer-paced), **paper-end reflective sensor on P0.6**
+  (HIGH = paper present), **release / tractor leaf switches on P0.0 / P0.2**.
+- **EEPROM (IC9, BR93C46)**: stores the EDS (Electronic DIP Switch) panel settings; serial
+  interface bit-banged on **P1** (P1.0=CS, P1.1=SK, P1.2=DI, P1.4=DO).
+- **Host interface**: Centronics parallel - data latched by the **gate array** at STROBE-fall,
+  **BUSY/ACK/PE/SEL/ERR** out via LS05 buffers; /IN-PRIME (pin 31) → P0.1//INT2. (The CPU's
+  UART TxD/RxD functions are unused; the serial option is an external converter box.)
 
 ---
 
@@ -37,11 +41,13 @@ mechanism; the few corrections it supplied are folded in and marked inline.
 2. **Zero RAM variables** 0x00–0xCF.
 3. **Port init** (exact values, see PORT_MAP.md):
    - `P0FUNC=0x20` → only P0.5 = DME special; `P0DIR=0x38` → P0.3 BUSY / P0.4 STB / P0.5 DME out.
-   - `P1DIR=0x07` → P1.0–2 out, **P1.3–7 in** (host data-in latch).
+   - `P1DIR=0x07` → P1.0–2 out (EEPROM CS/SK/DI), **P1.3–7 in** (P1.4 = EEPROM DO).
    - `P2P3FUNC=0x04`, `P2=0x90`, `P2DIR=0xFF` → P2 = 4-phase motor outputs, initial phase pattern.
-   - `P3DIR=0x03` → P3.0/1 out (motor drive-voltage selects, see PORT_MAP.md); `PHASECNT=0`.
-4. **Interrupt mask** via ICON1/2/3: enable the **Timer1/2/3** group (the motor/print real-time
-   timing) and one ICON3 source; mask the rest initially.
+   - `P3DIR=0x03` → P3.0/1 out (motor common voltage selects); P3.3-7 in (panel buttons);
+     `PHASECNT=0`.
+4. **Interrupt mask** via ICON1/2/3: enable only **/INT2 = host IN-PRIME** (ICON1 bit 2);
+   all Timer1/2/3 interrupts masked (ICON2 cleared - the motion code enables them per move);
+   Timer X count stopped (ICON3 bit 2).
 5. **RAM test**: write/verify `0xAA` then `0x55` at 0x3FFF via an indirect pointer; branch to a
    RAM-error handler on mismatch.
 6. **Load & validate settings**: read the stored settings record (EEPROM/EDS), compare a 2-byte
@@ -50,20 +56,26 @@ mechanism; the few corrections it supplied are folded in and marked inline.
    build the initial print parameters (pitch, quality, char table, line spacing, margins).
 7. **Mechanical init** 🔶: home the carriage and clear the head. The audible **power-on "beep"**
    is produced by `beep_tone` (§7) pulsing the **print-head solenoids** at Timer1 frequency - there
-   is no discrete buzzer. (The carriage-home seek itself is ❓ not yet traced line-by-line.)
+   is no discrete buzzer. The carriage-home seek is `home_seek` @0xD840: if the HP flag (P0.7)
+   is not already HIGH, start the carriage with a step budget, wait for the flag (double-read
+   debounce), reverse/retry if the budget runs out, then edge-align.
 8. Fall through to the **main loop** (0x8533).
 
 ### Interrupt architecture ✅
-Vectors (ROM2 0xFFF4–0xFFFF) point mostly into the **0x49xx–0x50xx range, which is RAM/ROM1
-system code mapped at CPU 0x4000–0x7FFF** (installed/available at init), not ROM2:
+Vectors (ROM2 0xFFF4–0xFFFF) point mostly into the **0x49xx–0x50xx range = ROM1 system code
+mapped at CPU 0x4000–0x7FFF**, not ROM2. HE/VE = the M50734's internal Horizontal/Vertical
+stepper-counter-empty interrupts (SMCONH/SMCONV timing), not external signals:
 | Vector | Target | Handler |
 |--------|--------|---------|
 | 0xFFF8 Timer1/2/3 | 0x4965 | `isr_timer123` - dispatches to motor micro-stepping sub-handlers |
-| 0xFFF6 HE/VE      | 0x5046 | `isr_he_ve` - per-column carriage timing: step SMCONH, reload HCNT |
-| 0xFFFA RI/INT1    | 0x5057 | `isr_ri_int1` - host receive (fills the input ring buffer) |
-| 0xFFFC INT2       | 0x505F | `isr_int2` - **emergency stop**: head off, motors off, mask IRQs |
+| 0xFFF6 HE/VE      | 0x5046 | `isr_he_ve` - H/V counter empty: step SMCONH, reload HCNT |
+| 0xFFFA RI/INT1    | 0x5057 | `isr_ri_int1` - **unused-source trap**: long beep → fatal-error path (host rx is polled via the gate array, not interrupt-driven) |
+| 0xFFFC INT2       | 0x505F | `isr_int2` - **host /IN-PRIME reset**: head off, motors off, wait for line HIGH, re-init |
 | 0xFFF4 TX/CNTR/BRK| 0x501A | UART/counter |
 | 0xFFFE RESET      | 0x8130 | (in ROM2) |
+
+(Note: the M50734 datasheet's vector table prints "INT1" for both priorities 2 and 3 - a
+period typo. Fig.3's ICON1 bit names + firmware behavior fix the assignment as shown.)
 
 ---
 
@@ -205,7 +217,8 @@ bit7, and OR-ing in descender/9th-pin bits. Result → `mem_000d`.
 3. **`sei`** → set **P0.4 = STBOUT** → load **STBT** (strobe width: **0xCE** normal, **0xF3** for
    the darker/high-quality mode per `mem_0053` bit3 / `mem_0057` bit1) → **drive P0.4 low** = fire
    the solenoids (Timer-S/STBT times the energizing pulse) → **`cli`**.
-4. **`clb 6,mem_0010`** (consume the slot) and clear the overlap flag; check P3.7 (a paper sensor).
+4. **`clb 6,mem_0010`** (consume the slot) and clear the overlap flag; check P3.7 (the
+   /ON-LINE button - a mid-job pause check, not a paper sensor).
 - **STBT therefore = dot energy/darkness**; four widths exist in firmware (0x26 used by `beep_tone`,
   0x78, 0xCE, 0xF3). This whole primitive is proven by `beep_tone` @0x6466, which reuses it (reg0
   ← 0x80/0xFF, STBT=0x26, paced by Timer1) to make the power-on tone - i.e. the "beep" is the head
@@ -222,11 +235,13 @@ bit7, and OR-ing in descender/9th-pin bits. Result → `mem_000d`.
   `mem_0010` bit6 to **release the foreground** to fire that column (§7). It also reloads **HCNT**
   (column counter) and increments the column index. `mem_0010` bit7 = "printing active" gates the
   whole sweep.
-- The **carriage encoder on P0.7** provides position feedback/index (polled in `print_sweep`
-  @0xD8D6); both edges correspond to the **half-step pitch** (2 dot-columns per box) seen in the
-  glyph data. So motion is timer-driven (open-loop constant velocity) with encoder sync.
-- The **HE/VE ISR** (`isr_he_ve` @0x5046) also steps SMCONH and reloads HCNT on its event - likely
-  the index/edge handler complementing the timer pacing.
+- **There is no carriage encoder.** P0.7 is the **home-position photo-interrupter** (HIGH =
+  shield at home), and its only reads are in the home-seek/edge-align code at 0xD840–0xD906
+  (earlier read as "encoder polling in print_sweep" - that was this same code). Sweep motion
+  is fully open-loop: timer-paced constant velocity from a known home reference.
+- The **HE/VE ISR** (`isr_he_ve` @0x5046) is the M50734's **H/V stepper-counter-empty**
+  interrupt (internal SMCONH/SMCONV event, per datasheet) - it steps SMCONH and reloads HCNT
+  when the horizontal counter expires, complementing the Timer1/2/3 pacing.
 - At end of line, `carriage_step` (@0xD929) pulses SMCONH to park/reverse; a RAM motor routine
   handles phase dwell/settle.
 - 🔶 **Bidirectional printing**: an `ESC U` / unidirectional flag exists; logic-seeking and the
@@ -236,8 +251,9 @@ bit7, and OR-ing in descender/9th-pin bits. Result → `mem_000d`.
 
 ## 9. Feeding paper (vertical) ✅ (line-feed quantization - fully traced)
 - The line-feed stepper is **SMCONV** (0xF9), 4 phases on P2 (high nibble), micro-stepped by the
-  **Timer1/2/3 ISR sub-handlers** (0x4E69–0x5008): they advance the SMCONV phase, read **P0.6**/P3.7
-  sensors, and decrement a 16-bit remaining-step counter `mem_0041/0042` (via `sub_4e5b`) to zero.
+  **Timer1/2/3 ISR sub-handlers** (0x4E69–0x5008): they advance the SMCONV phase, read the
+  **paper-end sensor (P0.6)** and the **/ON-LINE button (P3.7)**, and decrement a 16-bit
+  remaining-step counter `mem_0041/0042` (via `sub_4e5b`) to zero.
 - **Unit = 1/432 inch, and 1 unit = exactly 1 motor micro-step → 432 steps/inch.** Proven by the
   line-spacing handlers, which store the per-line distance in `mem_003f/0040` in these units:
   | Command | meaning | units stored |
@@ -257,7 +273,8 @@ bit7, and OR-ing in descender/9th-pin bits. Result → `mem_000d`.
   long ramp tables in **ROM1 0x05A42–0x06243**, indexed via `sub_d7e1`) until the count hits zero.
 - **Page/form control**: `ESC C` page length, `ESC N/O` skip-perforation, VTAB channels (`ESC B`),
   paper-out detect (`ESC 8/9`), ASF/paper control (`ESC EM`) set state the feed path honors.
-  🔶 The exact accel-ramp table contents and the P0.6/P3.7 sensor identities remain to confirm.
+  🔶 The exact accel-ramp table contents remain to confirm. (Sensor identities are settled:
+  P0.6 = paper-end sensor, P3.7 = On Line button - see PORT_MAP.md.)
 
 ---
 
@@ -271,10 +288,13 @@ bit7, and OR-ing in descender/9th-pin bits. Result → `mem_000d`.
 - RAM-test and settings-signature failures at boot jump to dedicated error handlers (0x7D6A/0x7D71).
 
 ## 11. Print-head thermal protection ✅ (manual p25 - newly added)
-A **thermistor in the head** feeds the CPU's **analog input (Port P4 / AN)**. The CPU compares it
-to V_REF: **≤115 °C** normal; **115–125 °C** "interval printing" (head pauses ≈0.5 s per line to
-cool); **≥125 °C** finish the current line then stop until it drops below 125 °C. (The firmware A/D
-read + thresholds are not yet located - an open item.)
+A **thermistor in the head** feeds **P4.3/AN3** (TH+ = 5 V, NTC down to a 10k/cap divider
+node; hotter = higher reading). The A/D read + thresholds are located: `head_thermal_check`
+@0xD990 is the ROM's only A/D sequence (ADCON channel 3, start, poll, read ADR). Thresholds
+on the 8-bit reading: **< 0xD1** normal (≤115 °C); **0xD1–0xD9** interval printing (~115–125 °C,
+10 pause calls per check ≈ the manual's 0.5 s/line); **≥ 0xDA** stop-and-cool (~125 °C: head
+masked via gate array, long waits, re-measure); **≥ 0xFC / < 0x04** = thermistor short/open →
+fatal error trap. Matches manual p25.
 
 ---
 
@@ -287,11 +307,15 @@ read + thresholds are not yet located - an open item.)
    CR/LF coalescing × spacing; `sub_d69d` + 72-step ramp allowance). Remaining detail: the
    accel-ramp table contents in ROM1 0x05A42–0x06243.
 
+3. **Carriage-home seek** ✅ RESOLVED - `home_seek` @0xD840 (see §1.7 / §8): P0.7 home flag,
+   step budget, debounce, reverse/retry, edge-align. No encoder exists.
+5. **Sensor map** ✅ RESOLVED (schematic trace, Aug 2026) - P0.0 release switch, P0.2 tractor
+   switch, P0.6 paper-end sensor, P0.7 home interrupter, P3.3–3.7 panel buttons, P4.3
+   thermistor. Full pin-level detail in PORT_MAP.md. (ASF command path still untraced.)
+6. **HE vs VE distinction** ✅ RESOLVED - datasheet: HE/VE are the internal Horizontal
+   (SMCONH/carriage) and Vertical (SMCONV/paper) stepper-counter-empty interrupts.
+
 Still open (not yet traced):
 2. **Bidirectional / logic-seeking** ❓ - direction decision, column reversal, dot-timing comp.
-3. **Carriage-home seek + power-on motion** ❓ - the home routine behind the observed power-on move.
-5. **Paper-out / ASF / sensor map** 🔶 - which P0.6/P3.7/P4 inputs are paper-out/home/cover; ASF path.
-6. **HE vs VE distinction** ❓ - which 0xFFF6 source is horizontal vs. vertical (now less critical:
-   per-column pacing is the Timer1/2/3 ISR; HE/VE appears to be the encoder index handler).
 
 These are the spots to either trace further in the firmware or verify against the technical manual.

@@ -22,9 +22,18 @@ entry 0x8533 main_loop "fetch host byte; apply char rules; dispatch"
 entry 0x4965 isr_timer123    "Timer1/2/3: motor micro-stepping pacing"
 entry 0x501a isr_tx_cntr_brk "TX / CNTR / BRK"
 entry 0x5046 isr_he_ve       "HE/VE: carriage column timing"
-entry 0x5057 isr_ri_int1     "RI/INT1: host receive"
-entry 0x505f isr_int2        "INT2: host reset / emergency stop"
+entry 0x5057 isr_ri_int1     "RI/INT1: unused sources - error trap (long beep + halt)"
+entry 0x505f isr_int2        "INT2: host /IN-PRIME (Centronics pin 31) reset / re-init"
 entry 0x64b7 get_rx_byte     "fetch next host byte from ring buffer"
+
+# --- EEPROM (BR93C46 on P1: P1.0=CS, P1.1=SK, P1.2=DI, P1.4=DO) ---
+label 0x771d eeprom_read     "16-bit read -> mem_0159/015a"
+label 0x775d eeprom_write    "16-bit write from mem_0159/015a"
+
+# --- sensors / panel / thermal ---
+label 0xff8f panel_read      "read P3 buttons debounced, AND #0xF8 (P3.3-7 = FONT/PITCH/SET/PF/OL)"
+label 0xd840 home_seek       "carriage home: seek HP flag on P0.7, step budget, edge-align"
+label 0xd990 head_thermal_check "AN3 thermistor: >=0xDA stop, 0xD1-0xD9 interval print, out-of-range = fault"
 
 # --- beeper (= print-head fire) ---
 entry 0x6466 beep_tone       "tone generator: gate-array beeper reg + Timer1"

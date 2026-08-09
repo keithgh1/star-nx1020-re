@@ -18439,6 +18439,7 @@ sub_493b:
     sbc mem_017b            ;495e  ed 7b 01 
     sta mem_0179            ;4961  8d 79 01 
     rts                     ;4964  60       
+    ;Timer1/2/3: motor micro-stepping pacing
 
 isr_timer123:
     clt                     ;4965  12       
@@ -19523,6 +19524,7 @@ lab_5008:
     sbc #0x00               ;5014  e9 00    
     sta mem_0143            ;5016  8d 43 01 
     rts                     ;5019  60       
+    ;TX / CNTR / BRK
 
 isr_tx_cntr_brk:
     clt                     ;501a  12       
@@ -19554,6 +19556,7 @@ lab_5038:
 
 lab_5045:
     rti                     ;5045  40       
+    ;HE/VE: carriage column timing
 
 isr_he_ve:
     bbc 4,ICON1,lab_5056    ;5046  97 ff 0d 
@@ -19565,6 +19568,7 @@ isr_he_ve:
 
 lab_5056:
     rti                     ;5056  40       
+    ;RI/INT1: unused sources - error trap (long beep + halt)
 
 isr_ri_int1:
     clt                     ;5057  12       
@@ -19572,6 +19576,7 @@ isr_ri_int1:
     jmp lab_7d55            ;505b  4c 55 7d 
 
     .byte 0x40              ;505e  40          UNKNOWN 0x40 '@' 
+    ;INT2: host /IN-PRIME (Centronics pin 31) reset / re-init
 
 isr_int2:
     clb 3,ICON1             ;505f  7f ff    
@@ -23603,6 +23608,7 @@ beep_short:
     ldm #0x33,mem_0008      ;63af  3c 33 08 
     ldm #0x00,mem_0009      ;63b2  3c 00 09 
     bra lab_63d6            ;63b5  80 1f    
+    ;short key/ack beep
 
 beep_key:
     jsr beep_wait_ready     ;63b7  20 5c 64 
@@ -23631,7 +23637,7 @@ sub_63da:
     ldm #0x00,mem_0009      ;63e0  3c 00 09 
     jsr beep_tone           ;63e3  20 66 64 
     jsr sub_770d            ;63e6  20 0d 77 
-    jsr \sub_ff8f           ;63e9  22 8f    
+    jsr \panel_read         ;63e9  22 8f    
     cmp #0xf8               ;63eb  c9 f8    
     beq lab_63f1            ;63ed  f0 02    
     sec                     ;63ef  38       
@@ -23649,7 +23655,7 @@ lab_63f1:
     ldm #0xcc,mem_0008      ;6409  3c cc 08 
     ldm #0x00,mem_0009      ;640c  3c 00 09 
     jsr beep_tone           ;640f  20 66 64 
-    jsr \sub_ff8f           ;6412  22 8f    
+    jsr \panel_read         ;6412  22 8f    
     cmp #0xf8               ;6414  c9 f8    
     beq lab_641a            ;6416  f0 02    
     sec                     ;6418  38       
@@ -23667,7 +23673,7 @@ lab_641a:
     ldm #0x00,mem_0009      ;6432  3c 00 09 
     jsr beep_tone           ;6435  20 66 64 
     jsr sub_770d            ;6438  20 0d 77 
-    jsr \sub_ff8f           ;643b  22 8f    
+    jsr \panel_read         ;643b  22 8f    
     cmp #0xf8               ;643d  c9 f8    
     beq lab_6443            ;643f  f0 02    
     sec                     ;6441  38       
@@ -23689,6 +23695,7 @@ beep_wait_ready:
     bbs 7,mem_003c,beep_wait_ready ;645f  e7 3c fa 
     bbs 7,mem_0010,beep_wait_ready ;6462  e7 10 f7 
     rts                     ;6465  60       
+    ;tone generator: gate-array beeper reg + Timer1
 
 beep_tone:
     jsr \sub_ff3d           ;6466  22 3d    
@@ -23734,6 +23741,7 @@ lab_64ae:
     ldm #0xff,WDT           ;64ae  3c ff fc 
     bbc 1,ICON2,lab_64ae    ;64b1  37 fe fa 
     jmp lab_647a            ;64b4  4c 7a 64 
+    ;fetch next host byte from ring buffer
 
 get_rx_byte:
     stx mem_0106            ;64b7  8e 06 01 
@@ -24206,7 +24214,7 @@ lab_67a3:
 sub_67a4:
     lda #0x00               ;67a4  a9 00    
     sta mem_0158            ;67a6  8d 58 01 
-    jsr sub_771d            ;67a9  20 1d 77 
+    jsr eeprom_read         ;67a9  20 1d 77 
     lda mem_0159            ;67ac  ad 59 01 
     sta mem_0053            ;67af  85 53    
     lda mem_015a            ;67b1  ad 5a 01 
@@ -26767,12 +26775,12 @@ lab_72e0:
     jsr sub_80ad            ;72e3  20 ad 80 
 
 lab_72e6:
-    jsr \sub_ff8f           ;72e6  22 8f    
+    jsr \panel_read         ;72e6  22 8f    
     cmp #0xf8               ;72e8  c9 f8    
     bne lab_72e6            ;72ea  d0 fa    
 
 lab_72ec:
-    jsr \sub_ff8f           ;72ec  22 8f    
+    jsr \panel_read         ;72ec  22 8f    
     bbc 5,a,lab_72f4        ;72ee  b3 04    
     bbc 6,a,lab_72f4        ;72f0  d3 02    
     bra lab_72ec            ;72f2  80 f8    
@@ -26911,7 +26919,7 @@ lab_73cc:
     jsr sub_80cb            ;73d1  20 cb 80 
 
 lab_73d4:
-    jsr \sub_ff8f           ;73d4  22 8f    
+    jsr \panel_read         ;73d4  22 8f    
     cmp #0xf8               ;73d6  c9 f8    
     bne lab_73d4            ;73d8  d0 fa    
     clb 0,mem_005a          ;73da  1f 5a    
@@ -27178,9 +27186,9 @@ sub_7543:
 
 lab_7546:
     ldm #0xff,WDT           ;7546  3c ff fc 
-    jsr \sub_ff8f           ;7549  22 8f    
+    jsr \panel_read         ;7549  22 8f    
     bbc 5,a,lab_7546        ;754b  b3 f9    
-    jsr \sub_ff8f           ;754d  22 8f    
+    jsr \panel_read         ;754d  22 8f    
     bbc 6,a,lab_7546        ;754f  d3 f5    
     clb 1,mem_00bc          ;7551  3f bc    
     clb 2,mem_007b          ;7553  5f 7b    
@@ -27467,8 +27475,9 @@ lab_7712:
     dec a                   ;7719  1a       
     bne lab_770f            ;771a  d0 f3    
     rts                     ;771c  60       
+    ;16-bit read -> mem_0159/015a
 
-sub_771d:
+eeprom_read:
     sei                     ;771d  78       
     asl mem_0158            ;771e  0e 58 01 
     asl mem_0158            ;7721  0e 58 01 
@@ -27510,8 +27519,9 @@ lab_7751:
     jsr \sub_ff71           ;7759  22 71    
     cli                     ;775b  58       
     rts                     ;775c  60       
+    ;16-bit write from mem_0159/015a
 
-sub_775d:
+eeprom_write:
     jsr sub_77ac            ;775d  20 ac 77 
     jsr sub_7816            ;7760  20 16 78 
     sei                     ;7763  78       
@@ -27685,7 +27695,7 @@ lab_7844:
     sta mem_0159            ;784e  8d 59 01 
     lda mem_8001,y          ;7851  b9 01 80 
     sta mem_015a            ;7854  8d 5a 01 
-    jsr sub_775d            ;7857  20 5d 77 
+    jsr eeprom_write        ;7857  20 5d 77 
     lda mem_0026            ;785a  a5 26    
     inc a                   ;785c  3a       
     sta mem_0026            ;785d  85 26    
@@ -27699,7 +27709,7 @@ sub_7864:
 lab_7867:
     lda mem_0026            ;7867  a5 26    
     sta mem_0158            ;7869  8d 58 01 
-    jsr sub_771d            ;786c  20 1d 77 
+    jsr eeprom_read         ;786c  20 1d 77 
     lda mem_0026            ;786f  a5 26    
     asl a                   ;7871  0a       
     tay                     ;7872  a8       
@@ -29479,7 +29489,7 @@ lab_81c3:
 lab_81c6:
     lda #0x3f               ;81c6  a9 3f    
     sta mem_0158            ;81c8  8d 58 01 
-    jsr sub_771d            ;81cb  20 1d 77 
+    jsr eeprom_read         ;81cb  20 1d 77 
     lda mem_0159            ;81ce  ad 59 01 
     cmp mem_807e            ;81d1  cd 7e 80 
     bne lab_81de            ;81d4  d0 08    
@@ -29720,7 +29730,7 @@ lab_8368:
     ldy mem_010d            ;838f  ac 0d 01 
     clb 2,mem_006d          ;8392  5f 6d    
     ldm #0x00,mem_0063      ;8394  3c 00 63 
-    jsr sub_d840            ;8397  20 40 d8 
+    jsr home_seek           ;8397  20 40 d8 
     jsr sub_d5cf            ;839a  20 cf d5 
     bbc 7,mem_0052,lab_83ad ;839d  f7 52 0d 
     bbs 6,P0,lab_83a6       ;83a0  c7 f6 03 
@@ -29802,7 +29812,7 @@ lab_843d:
     jsr sub_92a0            ;843d  20 a0 92 
     jsr sub_8c79            ;8440  20 79 8c 
     jsr sub_941e            ;8443  20 1e 94 
-    jsr \sub_ff8f           ;8446  22 8f    
+    jsr \panel_read         ;8446  22 8f    
     cmp #0x88               ;8448  c9 88    
     bne lab_844f            ;844a  d0 03    
     jmp lab_74c6            ;844c  4c c6 74 
@@ -29851,7 +29861,7 @@ lab_8485:
     bbc 5,mem_0056,lab_84c2 ;848b  b7 56 34 
 
 lab_848e:
-    jsr \sub_ff8f           ;848e  22 8f    
+    jsr \panel_read         ;848e  22 8f    
     cmp #0x78               ;8490  c9 78    
     bne lab_8497            ;8492  d0 03    
     jmp lab_65fd            ;8494  4c fd 65 
@@ -29875,7 +29885,7 @@ lab_84a5:
     seb 0,mem_009f          ;84b2  0f 9f    
 
 lab_84b4:
-    jsr \sub_ff8f           ;84b4  22 8f    
+    jsr \panel_read         ;84b4  22 8f    
     cmp #0xf8               ;84b6  c9 f8    
     bne lab_84b4            ;84b8  d0 fa    
     clb 6,mem_00b3          ;84ba  df b3    
@@ -29947,6 +29957,7 @@ lab_8519:
     ldm #0x03,mem_00a9      ;852d  3c 03 a9 
     seb 3,mem_005a          ;8530  6f 5a    
     rts                     ;8532  60       
+    ;fetch host byte; apply char rules; dispatch
 
 main_loop:
     ldm #0xff,WDT           ;8533  3c ff fc 
@@ -35028,11 +35039,11 @@ lab_a38f:
     sta mem_015a            ;a3a2  8d 5a 01 
     lda #0x01               ;a3a5  a9 01    
     sta mem_0158            ;a3a7  8d 58 01 
-    jsr sub_775d            ;a3aa  20 5d 77 
+    jsr eeprom_write        ;a3aa  20 5d 77 
     bbs 7,mem_0006,lab_a3cf ;a3ad  e7 06 1f 
     lda #0x00               ;a3b0  a9 00    
     sta mem_0158            ;a3b2  8d 58 01 
-    jsr sub_771d            ;a3b5  20 1d 77 
+    jsr eeprom_read         ;a3b5  20 1d 77 
     lda mem_015a            ;a3b8  ad 5a 01 
     bbs 2,mem_00c8,lab_a3c2 ;a3bb  47 c8 04 
     clb 4,a                 ;a3be  9b       
@@ -35047,7 +35058,7 @@ lab_a3c4:
     sta mem_015a            ;a3c4  8d 5a 01 
     lda #0x00               ;a3c7  a9 00    
     sta mem_0158            ;a3c9  8d 58 01 
-    jsr sub_775d            ;a3cc  20 5d 77 
+    jsr eeprom_write        ;a3cc  20 5d 77 
 
 lab_a3cf:
     tst mem_008f            ;a3cf  64 8f    
@@ -36324,7 +36335,7 @@ lab_aba6:
     sta mem_0159            ;abac  8d 59 01 
     jsr \sub_ff87           ;abaf  22 87    
     sta mem_015a            ;abb1  8d 5a 01 
-    jsr sub_775d            ;abb4  20 5d 77 
+    jsr eeprom_write        ;abb4  20 5d 77 
     pla                     ;abb7  68       
     inc a                   ;abb8  3a       
     cmp #0x40               ;abb9  c9 40    
@@ -36337,7 +36348,7 @@ lab_abc3:
     sta mem_0032            ;abc5  85 32    
     lsr a                   ;abc7  4a       
     sta mem_0158            ;abc8  8d 58 01 
-    jsr sub_771d            ;abcb  20 1d 77 
+    jsr eeprom_read         ;abcb  20 1d 77 
     jsr \sub_ff87           ;abce  22 87    
     pha                     ;abd0  48       
     lda mem_0032            ;abd1  a5 32    
@@ -36352,7 +36363,7 @@ lab_abe0:
     sta mem_015a            ;abe0  8d 5a 01 
 
 lab_abe3:
-    jsr sub_775d            ;abe3  20 5d 77 
+    jsr eeprom_write        ;abe3  20 5d 77 
     jsr beep_key            ;abe6  20 b7 63 
     jmp main_loop           ;abe9  4c 33 85 
 
@@ -36374,7 +36385,7 @@ lab_abfa:
     sta mem_015a            ;ac01  8d 5a 01 
     lda mem_0032            ;ac04  a5 32    
     sta mem_0158            ;ac06  8d 58 01 
-    jsr sub_775d            ;ac09  20 5d 77 
+    jsr eeprom_write        ;ac09  20 5d 77 
     inc mem_0032            ;ac0c  e6 32    
     dec mem_0033            ;ac0e  c6 33    
     bne lab_abfa            ;ac10  d0 e8    
@@ -39265,7 +39276,7 @@ lab_be1b:
     pha                     ;be3c  48       
     lda #0x00               ;be3d  a9 00    
     sta mem_0158            ;be3f  8d 58 01 
-    jsr sub_771d            ;be42  20 1d 77 
+    jsr eeprom_read         ;be42  20 1d 77 
     lda mem_0159            ;be45  ad 59 01 
     sta mem_0053            ;be48  85 53    
     lda mem_015a            ;be4a  ad 5a 01 
@@ -40492,7 +40503,7 @@ lab_c2e3:
 lab_c300:
     lda #0x00               ;c300  a9 00    
     sta mem_0158            ;c302  8d 58 01 
-    jsr sub_771d            ;c305  20 1d 77 
+    jsr eeprom_read         ;c305  20 1d 77 
     lda mem_0159            ;c308  ad 59 01 
     sta mem_0053            ;c30b  85 53    
     lda mem_015a            ;c30d  ad 5a 01 
@@ -40514,7 +40525,7 @@ lab_c300:
     jsr \sub_ff61           ;c32c  22 61    
 
 lab_c32e:
-    jsr \sub_ff8f           ;c32e  22 8f    
+    jsr \panel_read         ;c32e  22 8f    
     cmp #0xf8               ;c330  c9 f8    
     bne lab_c32e            ;c332  d0 fa    
     bbs 6,P0,lab_c341       ;c334  c7 f6 0a 
@@ -40534,7 +40545,7 @@ lab_c349:
 
 lab_c34c:
     jsr sub_7701            ;c34c  20 01 77 
-    jsr \sub_ff8f           ;c34f  22 8f    
+    jsr \panel_read         ;c34f  22 8f    
     bbs 4,a,lab_c358        ;c351  83 05    
     jsr sub_c45e            ;c353  20 5e c4 
     bra lab_c349            ;c356  80 f1    
@@ -40585,7 +40596,7 @@ lab_c390:
     sta mem_0159            ;c399  8d 59 01 
     lda mem_0054            ;c39c  a5 54    
     sta mem_015a            ;c39e  8d 5a 01 
-    jsr sub_775d            ;c3a1  20 5d 77 
+    jsr eeprom_write        ;c3a1  20 5d 77 
     bbs 5,mem_00b3,lab_c3aa ;c3a4  a7 b3 03 
     jmp lab_c403            ;c3a7  4c 03 c4 
 
@@ -40605,7 +40616,7 @@ lab_c3b5:
 lab_c3bc:
     lda #0x00               ;c3bc  a9 00    
     sta mem_0158            ;c3be  8d 58 01 
-    jsr sub_771d            ;c3c1  20 1d 77 
+    jsr eeprom_read         ;c3c1  20 1d 77 
     lda mem_015a            ;c3c4  ad 5a 01 
     and #0xc0               ;c3c7  29 c0    
     cmp #0x00               ;c3c9  c9 00    
@@ -40645,13 +40656,13 @@ lab_c3f4:
 
 lab_c3fd:
     sta mem_0158            ;c3fd  8d 58 01 
-    jsr sub_775d            ;c400  20 5d 77 
+    jsr eeprom_write        ;c400  20 5d 77 
 
 lab_c403:
     bbc 7,mem_0053,lab_c42f ;c403  f7 53 29 
     lda #0x01               ;c406  a9 01    
     sta mem_0158            ;c408  8d 58 01 
-    jsr sub_771d            ;c40b  20 1d 77 
+    jsr eeprom_read         ;c40b  20 1d 77 
     bbc 5,mem_0053,lab_c415 ;c40e  b7 53 04 
     lda mem_0159            ;c411  ad 59 01 
     seb 3,a                 ;c414  6b       
@@ -40671,7 +40682,7 @@ lab_c41a:
 lab_c427:
     lda #0x01               ;c427  a9 01    
     sta mem_0158            ;c429  8d 58 01 
-    jsr sub_775d            ;c42c  20 5d 77 
+    jsr eeprom_write        ;c42c  20 5d 77 
 
 lab_c42f:
     jsr beep_key            ;c42f  20 b7 63 
@@ -40679,7 +40690,7 @@ lab_c42f:
     jsr beep_key            ;c435  20 b7 63 
 
 lab_c438:
-    jsr \sub_ff8f           ;c438  22 8f    
+    jsr \panel_read         ;c438  22 8f    
     bbc 7,a,lab_c438        ;c43a  f3 fc    
     clb 5,mem_00b3          ;c43c  bf b3    
     jmp reset               ;c43e  4c 30 81 
@@ -40724,7 +40735,7 @@ lab_c46f:
     jsr \sub_ff58           ;c477  22 58    
 
 lab_c479:
-    jsr \sub_ff8f           ;c479  22 8f    
+    jsr \panel_read         ;c479  22 8f    
     cmp #0xf8               ;c47b  c9 f8    
     bne lab_c479            ;c47d  d0 fa    
     rts                     ;c47f  60       
@@ -40811,7 +40822,7 @@ lab_c4e3:
     sta mem_0054            ;c4e3  85 54    
 
 lab_c4e5:
-    jsr \sub_ff8f           ;c4e5  22 8f    
+    jsr \panel_read         ;c4e5  22 8f    
     cmp #0xf8               ;c4e7  c9 f8    
     bne lab_c4e5            ;c4e9  d0 fa    
     rts                     ;c4eb  60       
@@ -40906,7 +40917,7 @@ lab_c557:
     jsr beep_key            ;c55a  20 b7 63 
 
 lab_c55d:
-    jsr \sub_ff8f           ;c55d  22 8f    
+    jsr \panel_read         ;c55d  22 8f    
     cmp #0xf8               ;c55f  c9 f8    
     bne lab_c55d            ;c561  d0 fa    
     bbc 7,mem_0052,lab_c56f ;c563  f7 52 09 
@@ -40952,12 +40963,12 @@ lab_c5a1:
     seb 2,mem_00b3          ;c5ad  4f b3    
 
 lab_c5af:
-    jsr \sub_ff8f           ;c5af  22 8f    
+    jsr \panel_read         ;c5af  22 8f    
     cmp #0xf8               ;c5b1  c9 f8    
     bne lab_c5af            ;c5b3  d0 fa    
 
 lab_c5b5:
-    jsr \sub_ff8f           ;c5b5  22 8f    
+    jsr \panel_read         ;c5b5  22 8f    
     bbs 5,a,lab_c5c7        ;c5b7  a3 0e    
     lda mem_0242            ;c5b9  ad 42 02 
     cmp #0x11               ;c5bc  c9 11    
@@ -40998,13 +41009,13 @@ lab_c5dd:
     sta mem_0159            ;c5fa  8d 59 01 
     lda #0x00               ;c5fd  a9 00    
     sta mem_015a            ;c5ff  8d 5a 01 
-    jsr sub_775d            ;c602  20 5d 77 
+    jsr eeprom_write        ;c602  20 5d 77 
     jsr beep_key            ;c605  20 b7 63 
     jsr sub_76fd            ;c608  20 fd 76 
     jsr beep_key            ;c60b  20 b7 63 
 
 lab_c60e:
-    jsr \sub_ff8f           ;c60e  22 8f    
+    jsr \panel_read         ;c60e  22 8f    
     cmp #0xf8               ;c610  c9 f8    
     bne lab_c60e            ;c612  d0 fa    
     jsr sub_76fd            ;c614  20 fd 76 
@@ -41244,7 +41255,7 @@ lab_c746:
     cli                     ;c750  58       
 
 lab_c751:
-    jsr \sub_ff8f           ;c751  22 8f    
+    jsr \panel_read         ;c751  22 8f    
     bbc 6,a,lab_c751        ;c753  d3 fc    
     jsr sub_7701            ;c755  20 01 77 
     rts                     ;c758  60       
@@ -41300,7 +41311,7 @@ lab_c7b8:
 
 lab_c7ba:
     bbs 6,mem_00b3,lab_c81c ;c7ba  c7 b3 5f 
-    jsr \sub_ff8f           ;c7bd  22 8f    
+    jsr \panel_read         ;c7bd  22 8f    
     bbc 7,a,lab_c826        ;c7bf  f3 65    
     bbs 6,a,lab_c7c9        ;c7c1  c3 06    
     bbs 1,mem_005a,lab_c7c9 ;c7c3  27 5a 03 
@@ -41378,7 +41389,7 @@ lab_c82d:
 
 lab_c834:
     jsr sub_c71b            ;c834  20 1b c7 
-    jsr \sub_ff8f           ;c837  22 8f    
+    jsr \panel_read         ;c837  22 8f    
     bbs 7,a,lab_c7cc        ;c839  e3 91    
 
 lab_c83b:
@@ -41404,7 +41415,7 @@ lab_c85e:
 lab_c860:
     pha                     ;c860  48       
     jsr sub_c71b            ;c861  20 1b c7 
-    jsr \sub_ff8f           ;c864  22 8f    
+    jsr \panel_read         ;c864  22 8f    
     bbs 7,a,lab_c895        ;c866  e3 2d    
     pla                     ;c868  68       
     dec a                   ;c869  1a       
@@ -41427,7 +41438,7 @@ lab_c87d:
     seb 7,mem_005d          ;c88b  ef 5d    
 
 lab_c88d:
-    jsr \sub_ff8f           ;c88d  22 8f    
+    jsr \panel_read         ;c88d  22 8f    
     bbc 7,a,lab_c88d        ;c88f  f3 fc    
     clb 6,mem_00b3          ;c891  df b3    
     bra lab_c896            ;c893  80 01    
@@ -41449,7 +41460,7 @@ lab_c89f:
 lab_c8a5:
     jsr sub_d0b1            ;c8a5  20 b1 d0 
     jsr sub_d5cf            ;c8a8  20 cf d5 
-    jsr \sub_ff8f           ;c8ab  22 8f    
+    jsr \panel_read         ;c8ab  22 8f    
     bbc 4,a,lab_c8b2        ;c8ad  93 03    
     jmp lab_c9c7            ;c8af  4c c7 c9 
 
@@ -41458,7 +41469,7 @@ lab_c8b2:
     bbc 1,mem_005a,lab_c8bf ;c8b5  37 5a 07 
 
 lab_c8b8:
-    jsr \sub_ff8f           ;c8b8  22 8f    
+    jsr \panel_read         ;c8b8  22 8f    
     bbc 4,a,lab_c8b8        ;c8ba  93 fc    
     jmp lab_c8a5            ;c8bc  4c a5 c8 
 
@@ -41509,7 +41520,7 @@ lab_c8f2:
     jsr \sub_ff58           ;c8fa  22 58    
 
 lab_c8fc:
-    jsr \sub_ff8f           ;c8fc  22 8f    
+    jsr \panel_read         ;c8fc  22 8f    
     bbc 4,a,lab_c8fc        ;c8fe  93 fc    
     jsr sub_7705            ;c900  20 05 77 
     clb 1,mem_00ce          ;c903  3f ce    
@@ -41555,14 +41566,14 @@ lab_c93b:
     jsr beep_key            ;c94d  20 b7 63 
 
 lab_c950:
-    jsr \sub_ff8f           ;c950  22 8f    
+    jsr \panel_read         ;c950  22 8f    
     bbc 3,a,lab_c950        ;c952  73 fc    
     bbc 7,a,lab_c950        ;c954  f3 fa    
     jsr sub_7705            ;c956  20 05 77 
     jmp reset               ;c959  4c 30 81 
 
 lab_c95c:
-    jsr \sub_ff8f           ;c95c  22 8f    
+    jsr \panel_read         ;c95c  22 8f    
     bbc 3,a,lab_c95c        ;c95e  73 fc    
     bbc 7,a,lab_c95c        ;c960  f3 fa    
     rts                     ;c962  60       
@@ -41577,7 +41588,7 @@ sub_c96b:
     ldm #0x03,mem_002f      ;c96e  3c 03 2f 
 
 lab_c971:
-    jsr \sub_ff8f           ;c971  22 8f    
+    jsr \panel_read         ;c971  22 8f    
     bbs 7,a,lab_c98b        ;c973  e3 16    
     bbs 3,a,lab_c98b        ;c975  63 14    
     ldm #0xff,WDT           ;c977  3c ff fc 
@@ -41622,7 +41633,7 @@ lab_c9bd:
     jsr sub_901f            ;c9bd  20 1f 90 
 
 lab_c9c0:
-    jsr \sub_ff8f           ;c9c0  22 8f    
+    jsr \panel_read         ;c9c0  22 8f    
     bbc 7,a,lab_c9c0        ;c9c2  f3 fc    
     bbc 4,a,lab_c9c0        ;c9c4  93 fa    
     rts                     ;c9c6  60       
@@ -41637,7 +41648,7 @@ lab_c9cc:
 
 lab_c9d2:
     ldm #0xff,WDT           ;c9d2  3c ff fc 
-    jsr \sub_ff8f           ;c9d5  22 8f    
+    jsr \panel_read         ;c9d5  22 8f    
     bbc 3,a,lab_c9d2        ;c9d7  73 f9    
     jmp lab_c8a5            ;c9d9  4c a5 c8 
 
@@ -41681,7 +41692,7 @@ lab_ca07:
     jsr \sub_ff58           ;ca0e  22 58    
 
 lab_ca10:
-    jsr \sub_ff8f           ;ca10  22 8f    
+    jsr \panel_read         ;ca10  22 8f    
     bbs 3,a,lab_ca1e        ;ca12  63 0a    
     bbs 5,a,lab_ca19        ;ca14  a3 03    
     jmp lab_ca2d            ;ca16  4c 2d ca 
@@ -41729,13 +41740,13 @@ lab_ca4a:
     jsr sub_cac9            ;ca4e  20 c9 ca 
 
 lab_ca51:
-    jsr \sub_ff8f           ;ca51  22 8f    
+    jsr \panel_read         ;ca51  22 8f    
     bbs 3,a,lab_ca78        ;ca53  63 23    
     bbc 5,a,lab_ca51        ;ca55  b3 fa    
     jsr sub_7701            ;ca57  20 01 77 
 
 lab_ca5a:
-    jsr \sub_ff8f           ;ca5a  22 8f    
+    jsr \panel_read         ;ca5a  22 8f    
     bbs 3,a,lab_ca78        ;ca5c  63 1a    
     bbs 5,a,lab_ca5a        ;ca5e  a3 fa    
     lda mem_0036            ;ca60  a5 36    
@@ -41774,7 +41785,7 @@ lab_ca85:
     sta mem_00a2            ;ca8d  85 a2    
 
 lab_ca8f:
-    jsr \sub_ff8f           ;ca8f  22 8f    
+    jsr \panel_read         ;ca8f  22 8f    
     cmp #0xf8               ;ca91  c9 f8    
     bne lab_ca8f            ;ca93  d0 fa    
     clb 4,ICON2             ;ca95  9f fe    
@@ -41930,7 +41941,7 @@ lab_cb85:
 
 lab_cb8b:
     sta mem_0158            ;cb8b  8d 58 01 
-    jsr sub_775d            ;cb8e  20 5d 77 
+    jsr eeprom_write        ;cb8e  20 5d 77 
     lda mem_0140            ;cb91  ad 40 01 
     sta mem_0159            ;cb94  8d 59 01 
     lda mem_0141            ;cb97  ad 41 01 
@@ -41941,7 +41952,7 @@ lab_cb8b:
 
 lab_cba4:
     sta mem_0158            ;cba4  8d 58 01 
-    jsr sub_775d            ;cba7  20 5d 77 
+    jsr eeprom_write        ;cba7  20 5d 77 
     lda mem_013e            ;cbaa  ad 3e 01 
     sta mem_0159            ;cbad  8d 59 01 
     lda mem_013f            ;cbb0  ad 3f 01 
@@ -41952,7 +41963,7 @@ lab_cba4:
 
 lab_cbbd:
     sta mem_0158            ;cbbd  8d 58 01 
-    jsr sub_775d            ;cbc0  20 5d 77 
+    jsr eeprom_write        ;cbc0  20 5d 77 
     lda mem_0142            ;cbc3  ad 42 01 
     sta mem_0159            ;cbc6  8d 59 01 
     lda mem_0143            ;cbc9  ad 43 01 
@@ -41963,7 +41974,7 @@ lab_cbbd:
 
 lab_cbd6:
     sta mem_0158            ;cbd6  8d 58 01 
-    jsr sub_775d            ;cbd9  20 5d 77 
+    jsr eeprom_write        ;cbd9  20 5d 77 
     jsr beep_key            ;cbdc  20 b7 63 
     jsr sub_76fd            ;cbdf  20 fd 76 
     jsr beep_key            ;cbe2  20 b7 63 
@@ -41971,7 +41982,7 @@ lab_cbd6:
 
 lab_cbe7:
     jsr sub_770d            ;cbe7  20 0d 77 
-    jsr \sub_ff8f           ;cbea  22 8f    
+    jsr \panel_read         ;cbea  22 8f    
     cmp #0xe0               ;cbec  c9 e0    
     bne lab_cc4e            ;cbee  d0 5e    
     dey                     ;cbf0  88       
@@ -41998,7 +42009,7 @@ lab_cc04:
     sta mem_0158            ;cc15  8d 58 01 
     inc mem_0032            ;cc18  e6 32    
     sty mem_0033            ;cc1a  84 33    
-    jsr sub_775d            ;cc1c  20 5d 77 
+    jsr eeprom_write        ;cc1c  20 5d 77 
     ldy mem_0033            ;cc1f  a4 33    
     pla                     ;cc21  68       
     dec a                   ;cc22  1a       
@@ -42015,7 +42026,7 @@ lab_cc34:
 
 lab_cc36:
     sta mem_0158            ;cc36  8d 58 01 
-    jsr sub_775d            ;cc39  20 5d 77 
+    jsr eeprom_write        ;cc39  20 5d 77 
     jsr beep_key            ;cc3c  20 b7 63 
     jsr sub_7701            ;cc3f  20 01 77 
     jsr beep_key            ;cc42  20 b7 63 
@@ -42024,20 +42035,20 @@ lab_cc36:
     jsr sub_7701            ;cc4b  20 01 77 
 
 lab_cc4e:
-    jsr \sub_ff8f           ;cc4e  22 8f    
+    jsr \panel_read         ;cc4e  22 8f    
     cmp #0xf8               ;cc50  c9 f8    
     bne lab_cc4e            ;cc52  d0 fa    
     jmp lab_caa2            ;cc54  4c a2 ca 
 
 lab_cc57:
-    jsr \sub_ff8f           ;cc57  22 8f    
+    jsr \panel_read         ;cc57  22 8f    
     bbc 6,a,lab_cc5e        ;cc59  d3 03    
     jmp lab_cd46            ;cc5b  4c 46 cd 
 
 lab_cc5e:
     bbc 3,mem_006d,lab_cc6e ;cc5e  77 6d 0d 
     jsr sub_7701            ;cc61  20 01 77 
-    jsr \sub_ff8f           ;cc64  22 8f    
+    jsr \panel_read         ;cc64  22 8f    
     bbs 6,a,lab_cc6b        ;cc66  c3 03    
     jmp lab_cd4d            ;cc68  4c 4d cd 
 
@@ -42064,7 +42075,7 @@ lab_cc77:
 
 lab_cc8b:
     jsr sub_7705            ;cc8b  20 05 77 
-    jsr \sub_ff8f           ;cc8e  22 8f    
+    jsr \panel_read         ;cc8e  22 8f    
     bbc 6,a,lab_cc95        ;cc90  d3 03    
     jmp lab_cd27            ;cc92  4c 27 cd 
 
@@ -42085,7 +42096,7 @@ lab_cc9f:
     clb 4,mem_005c          ;cca8  9f 5c    
     bbs 7,mem_005e,lab_ccf6 ;ccaa  e7 5e 49 
     clb 5,mem_00ce          ;ccad  bf ce    
-    jsr \sub_ff8f           ;ccaf  22 8f    
+    jsr \panel_read         ;ccaf  22 8f    
     and #0xc0               ;ccb1  29 c0    
     cmp #0x80               ;ccb3  c9 80    
     bne lab_ccf0            ;ccb5  d0 39    
@@ -42149,7 +42160,7 @@ lab_cd0d:
     dex                     ;cd10  ca       
     bne lab_cd0d            ;cd11  d0 fa    
     bbs 5,mem_00ce,lab_cd31 ;cd13  a7 ce 1b 
-    jsr \sub_ff8f           ;cd16  22 8f    
+    jsr \panel_read         ;cd16  22 8f    
     and #0xc0               ;cd18  29 c0    
     cmp #0x80               ;cd1a  c9 80    
     bne lab_cd21            ;cd1c  d0 03    
@@ -42161,7 +42172,7 @@ lab_cd21:
     bra lab_cd2b            ;cd25  80 04    
 
 lab_cd27:
-    jsr \sub_ff8f           ;cd27  22 8f    
+    jsr \panel_read         ;cd27  22 8f    
     bbc 7,a,lab_cd27        ;cd29  f3 fc    
 
 lab_cd2b:
@@ -42174,7 +42185,7 @@ lab_cd31:
 
 lab_cd35:
     jsr sub_7705            ;cd35  20 05 77 
-    jsr \sub_ff8f           ;cd38  22 8f    
+    jsr \panel_read         ;cd38  22 8f    
     and #0xc0               ;cd3a  29 c0    
     cmp #0x80               ;cd3c  c9 80    
     bne lab_cd27            ;cd3e  d0 e7    
@@ -42183,7 +42194,7 @@ lab_cd35:
     jmp lab_cc5e            ;cd43  4c 5e cc 
 
 lab_cd46:
-    jsr \sub_ff8f           ;cd46  22 8f    
+    jsr \panel_read         ;cd46  22 8f    
     bbc 5,a,lab_cd4d        ;cd48  b3 03    
     jmp lab_cdbb            ;cd4a  4c bb cd 
 
@@ -42249,7 +42260,7 @@ lab_cdaf:
     jmp lab_ce82            ;cdaf  4c 82 ce 
 
 lab_cdb2:
-    jsr \sub_ff8f           ;cdb2  22 8f    
+    jsr \panel_read         ;cdb2  22 8f    
     bbc 5,a,lab_cdb2        ;cdb4  b3 fc    
     bbc 6,a,lab_cdb2        ;cdb6  d3 fa    
 
@@ -42296,11 +42307,11 @@ lab_ce00:
     seb 2,mem_006d          ;ce05  4f 6d    
     jsr sub_d085            ;ce07  20 85 d0 
     seb 7,mem_00b3          ;ce0a  ef b3    
-    jsr \sub_ff8f           ;ce0c  22 8f    
+    jsr \panel_read         ;ce0c  22 8f    
     bbs 7,a,lab_ce2c        ;ce0e  e3 1c    
 
 lab_ce10:
-    jsr \sub_ff8f           ;ce10  22 8f    
+    jsr \panel_read         ;ce10  22 8f    
     bbs 3,a,lab_ce17        ;ce12  63 03    
     jsr sub_c910            ;ce14  20 10 c9 
 
@@ -42322,7 +42333,7 @@ lab_ce2c:
     jmp lab_c89f            ;ce2c  4c 9f c8 
 
 lab_ce2f:
-    jsr \sub_ff8f           ;ce2f  22 8f    
+    jsr \panel_read         ;ce2f  22 8f    
     bbc 7,a,lab_ce10        ;ce31  f3 dd    
     bra lab_ce2c            ;ce33  80 f7    
 
@@ -42347,17 +42358,17 @@ lab_ce45:
 lab_ce4a:
     jsr \sub_ff51           ;ce4a  22 51    
     jsr sub_d0a2            ;ce4c  20 a2 d0 
-    jsr \sub_ff8f           ;ce4f  22 8f    
+    jsr \panel_read         ;ce4f  22 8f    
     bbs 7,a,lab_ce5a        ;ce51  e3 07    
     jsr sub_c71b            ;ce53  20 1b c7 
-    jsr \sub_ff8f           ;ce56  22 8f    
+    jsr \panel_read         ;ce56  22 8f    
     bbc 7,a,lab_ce5d        ;ce58  f3 03    
 
 lab_ce5a:
     jmp lab_c8a5            ;ce5a  4c a5 c8 
 
 lab_ce5d:
-    jsr \sub_ff8f           ;ce5d  22 8f    
+    jsr \panel_read         ;ce5d  22 8f    
     bbs 4,a,lab_ce66        ;ce5f  83 05    
     jsr sub_c98d            ;ce61  20 8d c9 
     bra lab_ce7f            ;ce64  80 19    
@@ -42383,13 +42394,13 @@ lab_ce7f:
 
 lab_ce82:
     jsr sub_c71b            ;ce82  20 1b c7 
-    jsr \sub_ff8f           ;ce85  22 8f    
+    jsr \panel_read         ;ce85  22 8f    
     bbc 7,a,lab_ce5d        ;ce87  f3 d4    
     jsr sub_7701            ;ce89  20 01 77 
-    jsr \sub_ff8f           ;ce8c  22 8f    
+    jsr \panel_read         ;ce8c  22 8f    
     bbc 7,a,lab_ce5d        ;ce8e  f3 cd    
     jsr sub_7709            ;ce90  20 09 77 
-    jsr \sub_ff8f           ;ce93  22 8f    
+    jsr \panel_read         ;ce93  22 8f    
     bbc 7,a,lab_ce5d        ;ce95  f3 c6    
     jsr beep_key            ;ce97  20 b7 63 
     bbs 1,mem_005a,lab_cea0 ;ce9a  27 5a 03 
@@ -42620,7 +42631,7 @@ lab_cffc:
     clb 2,mem_00ce          ;d001  5f ce    
 
 lab_d003:
-    jsr \sub_ff8f           ;d003  22 8f    
+    jsr \panel_read         ;d003  22 8f    
     bbc 7,a,lab_d003        ;d005  f3 fc    
     clb 6,mem_00b3          ;d007  df b3    
     rts                     ;d009  60       
@@ -42873,15 +42884,15 @@ lab_d175:
     clb 3,mem_006d          ;d175  7f 6d    
 
 lab_d177:
-    jsr \sub_ff8f           ;d177  22 8f    
+    jsr \panel_read         ;d177  22 8f    
     bbs 7,a,lab_d183        ;d179  e3 08    
-    jsr \sub_ff8f           ;d17b  22 8f    
+    jsr \panel_read         ;d17b  22 8f    
     bbc 6,a,sub_d125        ;d17d  d3 a6    
     bbc 5,a,sub_d14b        ;d17f  b3 ca    
     bra lab_d16b            ;d181  80 e8    
 
 lab_d183:
-    jsr \sub_ff8f           ;d183  22 8f    
+    jsr \panel_read         ;d183  22 8f    
     bbc 6,a,lab_d177        ;d185  d3 f0    
     bbc 5,a,lab_d177        ;d187  b3 ee    
     rts                     ;d189  60       
@@ -43165,7 +43176,7 @@ lab_d36c:
 
 lab_d377:
     clb 2,mem_0052          ;d377  5f 52    
-    jsr sub_d840            ;d379  20 40 d8 
+    jsr home_seek           ;d379  20 40 d8 
     clb 5,mem_0052          ;d37c  bf 52    
     clb 3,mem_0052          ;d37e  7f 52    
     ldm #0x00,mem_00a4      ;d380  3c 00 a4 
@@ -43907,8 +43918,9 @@ sub_d82e:
     clb 2,ICON3             ;d83a  5f fd    
     ldm #0xff,WDT           ;d83c  3c ff fc 
     rts                     ;d83f  60       
+    ;carriage home: seek HP flag on P0.7, step budget, edge-align
 
-sub_d840:
+home_seek:
     seb 2,mem_005e          ;d840  4f 5e    
     bbs 7,P0,lab_d877       ;d842  e7 f6 32 
     seb 1,SMCONH            ;d845  2f f8    
@@ -44087,15 +44099,16 @@ lab_d969:
     sta mem_003d            ;d97f  85 3d    
 
 lab_d981:
-    bbc 6,mem_005d,lab_d990 ;d981  d7 5d 0c 
+    bbc 6,mem_005d,head_thermal_check ;d981  d7 5d 0c 
 
 lab_d984:
     ldm #0xff,WDT           ;d984  3c ff fc 
     bbs 7,mem_0010,lab_d984 ;d987  e7 10 fa 
     bbs 7,mem_003c,lab_d984 ;d98a  e7 3c f7 
     jsr sub_d553            ;d98d  20 53 d5 
+    ;AN3 thermistor: >=0xDA stop, 0xD1-0xD9 interval print, out-of-range = fault
 
-lab_d990:
+head_thermal_check:
     seb 0,ADCON             ;d990  0f e9    
     seb 1,ADCON             ;d992  2f e9    
     seb 2,ADCON             ;d994  4f e9    
@@ -50253,12 +50266,13 @@ sub_ff87:
 sub_ff8b:
     jsr sub_894c            ;ff8b  20 4c 89 
     rts                     ;ff8e  60       
+    ;read P3 buttons debounced, AND #0xF8 (P3.3-7 = FONT/PITCH/SET/PF/OL)
 
-sub_ff8f:
+panel_read:
     lda P3                  ;ff8f  a5 ee    
     ldm #0xff,WDT           ;ff91  3c ff fc 
     cmp P3                  ;ff94  c5 ee    
-    bne sub_ff8f            ;ff96  d0 f7    
+    bne panel_read          ;ff96  d0 f7    
     and #0xf8               ;ff98  29 f8    
     rts                     ;ff9a  60       
 
