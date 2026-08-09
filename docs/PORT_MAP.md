@@ -25,18 +25,27 @@ Init: `P0FUNC=0x20` (only P0.5 = DME special), `P0DIR=0x38` (P0.3/4/5 outputs, r
 
 | Bit | Mode | Role |
 |----|------|------|
-| 0 | port, in | **/RELEASE** release-lever leaf switch (4.7k pullup + 4.7k series; closed = LOW). INT1 special function unused: interrupt masked, its vector holds an error trap (see below). |
+| 0 | port, in | **/RELEASE** release-lever leaf switch (4.7k pullup + 4.7k series). Open = HIGH = lever in friction position; closed = LOW = lever in tractor position (manual p36). INT1 special function unused: interrupt masked, its vector holds an error trap (see below). |
 | 1 | special | **/INT2 = /IN-PRIME**, Centronics pin 31 (active low). Host pulses LOW to reset the printer. `isr_int2`@505F shuts off head + motors, spin-waits for the line to return HIGH (`bbc 1,P0` @0x5099, kicking WDT), then re-initializes. |
-| 2 | port, in | **/TRACTOR** tractor-position leaf switch (same pullup + series circuit as bit 0). CNTR special function unused. |
+| 2 | port, in | **/TRACTOR** tractor-position leaf switch (same pullup + series circuit as bit 0). Open = HIGH = tractor up (pull-tractor); closed = LOW = tractor down (push-tractor) (manual p36). CNTR special function unused. |
 | 3 | BUSYOUT | Centronics BUSY (via LS05, CPU pin 41) |
 | 4 | STBOUT | print-head energize strobe: drive LOW to fire; `STBT` (Timer S, 0xFA) sets the solenoid pulse width |
 | 5 | DME | data-memory enable: gates the 2nd 64K data space = gate-array + font-ROM window |
 | 6 | port, in | **PE** paper-end reflective sensor. LED always on (220R to GND); phototransistor emitter output into P0.6. **HIGH = paper present.** TxD special function unused. |
 | 7 | port, in | **HP** home-position photo-interrupter (pullup on phototransistor collector). **HIGH = beam blocked = carriage shield at home.** Polled only by the home-seek routine (`sub_d840`); there is no carriage encoder - sweep pacing is open-loop, timer-driven. RxD special function unused. |
 
-The release/tractor pair is checked throughout the feed/print code (~28 sites, often both
-bits together) to determine the paper path. Which mechanical position closes each switch is
-not yet determined (would need the mechanism or the feed-code branch semantics).
+The release/tractor pair encodes the paper-feed mode (manual Fig. 2-23, p35):
+
+| P0.0 (release) | P0.2 (tractor) | Mode |
+|---|---|---|
+| HIGH (friction pos.) | LOW (tractor down) | Friction feed (single sheets) |
+| HIGH (friction pos.) | HIGH (tractor up) | invalid - manual marks it "(Error)" |
+| LOW (tractor pos.) | LOW (tractor down) | Push tractor |
+| LOW (tractor pos.) | HIGH (tractor up) | Pull tractor |
+
+Checked throughout the feed/print code (~28 sites). The frequent paired tests that branch
+away when either bit is HIGH (e.g. 0x9666, 0xC7E0, 0xCD53) are "not push-tractor" checks:
+push-tractor is the only both-LOW state.
 
 ## Port P1 (0xF3, in-latch 0xF2, dir 0xF4) - EEPROM serial interface ✅
 The BR93C46 EEPROM (IC9) is bit-banged on P1. Init `P1DIR=0x07` (P1.0-2 out, P1.3-7 in).
@@ -70,7 +79,7 @@ Init: `P2P3FUNC=0x04` (Timer-S source = f/16; P2 four-phase normal), `P3DIR=0x03
 |----|------|
 | 0 | **CR CMN A/B voltage select** (carriage-motor commons, TR1/TR6): HIGH = +25 V drive / LOW = +5 V holding bias |
 | 1 | **LF CMN A/B voltage select** (paper-feed-motor commons, TR4/TR5): same scheme |
-| 2 | unused (never accessed by firmware; likely NC) |
+| 2 | unconnected ✅ (absent from the schematic; firmware never accesses it; SIO special function unused) |
 | 3 | **/FONT** button |
 | 4 | **/PITCH** button |
 | 5 | **/SET** button |

@@ -27,7 +27,8 @@ mechanism; the few corrections it supplied are folded in and marked inline.
   paper advanced by the **line-feed stepper (SMCONV)**. Sensors: **home-position
   photo-interrupter on P0.7** (HIGH = at home; used only by the home-seek - there is no
   carriage encoder, sweeps are open-loop timer-paced), **paper-end reflective sensor on P0.6**
-  (HIGH = paper present), **release / tractor leaf switches on P0.0 / P0.2**.
+  (HIGH = paper present), **release / tractor leaf switches on P0.0 / P0.2** (the pair encodes
+  friction / push-tractor / pull-tractor; both-HIGH is the manual's error state - PORT_MAP.md).
 - **EEPROM (IC9, BR93C46)**: stores the EDS (Electronic DIP Switch) panel settings; serial
   interface bit-banged on **P1** (P1.0=CS, P1.1=SK, P1.2=DI, P1.4=DO).
 - **Host interface**: Centronics parallel - data latched by the **gate array** at STROBE-fall,
