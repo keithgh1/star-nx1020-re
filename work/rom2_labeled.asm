@@ -30255,10 +30255,11 @@ lab_86d3:
 lab_86e0:
     sta mem_004a            ;86e0  85 4a    
     pla                     ;86e2  68       
-    bbc 3,mem_004a,lab_86e9 ;86e3  77 4a 03 
+    bbc 3,mem_004a,draft_font_select ;86e3  77 4a 03 
     jmp lab_876a            ;86e6  4c 6a 87 
+    ;font idx: HS flag (mem_00bc.1) -> 0x0A (HS-Draft group); elite (mem_0062.1) -> +1; NLQ via 0x8764 table
 
-lab_86e9:
+draft_font_select:
     ldm #0x00,mem_004c      ;86e9  3c 00 4c 
     bbc 1,mem_00bc,lab_86f4 ;86ec  37 bc 05 
     ldm #0x0a,mem_00c0      ;86ef  3c 0a c0 

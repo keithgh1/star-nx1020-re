@@ -73,13 +73,13 @@ The coverage audit shows bank 2 is essentially all tables, not bitmaps.
 |------|---------|
 | 0x10000–~0x102xx | ✅ **font DESCRIPTOR blocks** (0x40 B each) + index: idx 0x14/0x1e/0x28/0x32 at file 0x10110/0x10150/0x10190/0x101D0 (= Courier/Sanserif/Orator/Script). `rec byte3 & 3` = glyph-data bank. |
 | 0x10300–0x12700 | ✅ **3-byte descriptor/index tables** ('00 XX' / 'BC 00 00' / '01 00 XX' entries) - the per-char glyph-pointer chains, NOT fixed-cell bitmaps (earlier "stride 12/24 fixed-cell fonts" guess was wrong; these are pointer tables). |
-| 0x12A81–~0x14C19 | ✅ **8-dot Draft metrics tables** (8 B/char). By width: **0x132C1 = Pica** (w≤11, the manual's 9×11), **0x13DE1 = Condensed** (w≤7), and **two distinct 9-wide faces @0x12B91/0x14509 (identity UNDETERMINED - not labeled; one plausibly Elite. NOT "HS-Draft": HS reuses the Draft bitmap + faster carriage, it is not separately stored)**. Accent/upper-half/box-gfx companion sets @0x13129/0x13851/0x14379/0x14AA1. |
+| 0x12A81–~0x14C19 | ✅ **8-dot Draft metrics tables** (8 B/char) - two parallel 585-entry groups (Draft @0x12771, HS-Draft @0x139C1), faces at identical entry offsets, selected by font idx (HS flag → group 1 @0x86EC; elite → idx+1 @0x8729). Identified: **0x132C1 = Draft Pica** (w≤11), **0x12B91 = Draft Elite** (9-wide), **0x14509 = HS-Draft Pica** (9-wide), **0x13DE1 = HS-Draft Elite** (w≤7). Condensed = programmatic transform (not stored). Draft companions @0x13129/0x13851; HS companions @0x14379/0x14AA1. |
 | 0x14C19–0x17FFF | ✅ **16-dot NLQ metrics tables**: Courier 0x14F21, Sanserif 0x15C81, Orator 0x168F1, Script 0x17561 (+ IBM-symbols 0x14E21, box-graphics 0x15851 supplements). |
 
 ### Bank 3 - 0x18000–0x1FFFF : **8-dot Draft glyph data + Courier/Sanserif NLQ data** ✅
 | file | finding |
 |------|---------|
-| 0x183B8–~0x1A0A0 | ✅ **8-dot Draft glyph bitmaps** for ALL pitch variants (1 B/col, bit7=top). Pica set @**0x18AA2**; the Elite/Condensed/HS pitch sets interleave through here (reached via their bank2 metrics tables, `file = ptr+0x10000`). Sheets: FONT_draft.png + SET_8dot_*.png. |
+| 0x183B8–~0x1A0A0 | ✅ **8-dot Draft + HS-Draft glyph bitmaps** (1 B/col, bit7=top). Draft Pica @**0x18AA2**, Draft Elite @0x184C3, HS-Draft Elite @0x1964C, HS-Draft Pica @0x19AF7, + companions (reached via the bank2 metrics tables, `file = ptr+0x10000`). Sheets: FONT_draft.png + SET_8dot_*.png. |
 | 0x1A0D7–0x1FFFF | ✅ **Courier + Sanserif 16-dot NLQ glyph data** (planar, 2 B/col). `file = ptr+0x10000`. Sheets: FONT_courier.png / FONT_sanserif.png. (Orator/Script NLQ data is in **bank 0**, see above; they wrap bank3→bank0 mid-alphabet.) |
 
 ### Confirmed font bit-format (proportional sets) ✅
@@ -107,8 +107,9 @@ ROM1 accounted for: firmware bank1 **25%**, system code (ISRs) **12.5%**, glyph 
 remnant). In summary: bank0 0x00000–0x03FFF = Orator/Script NLQ data; bank2
 0x11000/0x12000 = pointer tables (not fixed-cell fonts); the 0x10000 record table = font
 descriptor blocks (idx→bank). **CP437 confirmed** (the 0x80+ glyphs match the users manual's
-Ch.9 chart). Font list: Draft + HS-Draft + Courier/Sanserif/Orator/Script (±italic),
-pitches Pica/Elite/Condensed.
+Ch.9 chart). Full stored-font list: Draft (pica+elite) + HS-Draft (its own pica+elite) +
+Courier/Sanserif/Orator/Script (italic = programmatic slant); condensed = programmatic
+transform.
 
 ## Beeper
 - `beep_tone`@6466 (gate-array beeper reg + Timer1 + duration mem_0008/09); presets

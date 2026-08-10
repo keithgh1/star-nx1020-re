@@ -30,6 +30,9 @@ entry 0x64b7 get_rx_byte     "fetch next host byte from ring buffer"
 label 0x771d eeprom_read     "16-bit read -> mem_0159/015a"
 label 0x775d eeprom_write    "16-bit write from mem_0159/015a"
 
+# --- font selection ---
+label 0x86e9 draft_font_select "font idx: HS flag (mem_00bc.1) -> 0x0A (HS-Draft group); elite (mem_0062.1) -> +1; NLQ via 0x8764 table"
+
 # --- motor motion / ramp tables ---
 label 0x4230 motion_start    "arm a move: ramp ptr = ramp_ptr_accel[profile mem_0010&0x0F], start Timer2/3 + HE"
 label 0x443b ramp_ptr_accel  "11 words: accel dwell-stream starts per motion profile"

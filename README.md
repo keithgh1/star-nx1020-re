@@ -36,10 +36,12 @@ pitch variants and extended character sets. <i>Views directly on GitHub; also as
 ## Results
 
 - **Every resident typeface extracted exactly**: Draft plus the four 16-dot NLQ faces
-  (Courier, Sanserif, Orator, Script), the draft pitch variants, and the accent/box-graphics
+  (Courier, Sanserif, Orator, Script), the draft pitch faces, and the accent/box-graphics
   sets - all rendered as full glyph sheets. Notable findings: NLQ glyphs are stored
   planar-interleaved for the head's two-pass half-dot printing, italics are a programmatic
-  slant (not stored), and HS-Draft is the same Draft data printed with faster carriage timing.
+  slant (not stored), and High-Speed Draft turns out to have its own stored faces - drawn
+  narrower than Draft's (9-wide pica, 7-wide elite) so each glyph needs fewer head fires,
+  which is half of where its speed comes from.
 - **The font ROM mapped at ~88% coverage** - glyphs, metrics, descriptor/pointer tables, and
   firmware/system regions all accounted for.
 - **The firmware understood end to end** - power-on through command parsing, line building,

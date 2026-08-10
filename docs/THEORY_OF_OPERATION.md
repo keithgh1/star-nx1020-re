@@ -163,17 +163,23 @@ the manual's table:
 | `0x80` | Draft, HS off, condensed | 17 CPI DRAFT |
 | `0xC0` | LQ (`mem_007b` bit2/4), pica | 10 CPI COURIER |
 
-**High-Speed Draft** = draft quality run at higher carriage speed:
+**High-Speed Draft** = its own stored faces + faster carriage (corrected Aug 2026):
 - **`mem_00bc` bit4 = HS enable** (from EDS / master select). `sub_99ad` then sets
   **`mem_00bc` bit1 = HS active** *only* when: draft quality AND HS enabled AND **not condensed**
   AND not the bit5 special mode - so HS applies only at pica/elite draft (matching the spec).
-- **Effect**: the HS-active flag selects **faster carriage-motor timing constants** in the motor
-  stepping routines (e.g. `sub_4809` loads period `0x014C` HS vs `0x018C` normal; `sub_481d`
-  `0x0088` vs `0x00C8` - shorter = faster), and `sub_9e0b` programs a different speed bit into the
-  gate-array control reg (draft → control **bit4** HS vs **bit5** normal). It also adjusts glyph
-  width/spacing (`sub_8b4b` reads the flag). Net: **200/225 cps** vs Draft's **150/180 cps**.
-- It is the same draft glyph data, just printed with the carriage moving faster (wider effective
-  dot spacing), which is why HS-Draft output is lighter/faster than normal Draft.
+- **Effect 1 - speed**: the HS-active flag selects **faster carriage-motor timing constants**
+  (e.g. `sub_4809` loads period `0x014C` HS vs `0x018C` normal; `sub_481d` `0x0088` vs `0x00C8`),
+  and `sub_9e0b` programs a different speed bit into the gate-array control reg (draft →
+  control **bit4** HS vs **bit5** normal). Net: **200/225 cps** vs Draft's **150/180 cps**.
+- **Effect 2 - its own glyphs** (this was missed in the first trace): at 0x86EC the same
+  HS-active flag selects **font index 0x0A = the HS-Draft descriptor group**, whose stored
+  faces are narrower than Draft's (pica 9-wide vs 11, elite 7-wide vs 9). Fewer columns =
+  fewer head fires per glyph, which is the other half of the speed and why HS output looks
+  thin. The elite pitch bit (`mem_0062.1`) adds +1 to the font index in either group (@0x8729);
+  condensed is a programmatic dot-pitch transform, not a stored set. The 8-dot metrics region
+  is two parallel 585-entry groups (Draft @file 0x12771, HS-Draft @0x139C1) with the faces at
+  identical entry offsets; final metrics address = descriptor-block base + entry#×8 (which is
+  why no metrics addresses appear as constants in either ROM).
 
 ---
 
