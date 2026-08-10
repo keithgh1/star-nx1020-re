@@ -17306,15 +17306,16 @@ lab_4219:
     sta mem_012b            ;421b  8d 2b 01 
     lda mem_0034            ;421e  a5 34    
     sta mem_012c            ;4220  8d 2c 01 
-    bra sub_4230            ;4223  80 0b    
+    bra motion_start        ;4223  80 0b    
 
 lab_4225:
     lda #0x00               ;4225  a9 00    
     sta mem_012b            ;4227  8d 2b 01 
     sta mem_012c            ;422a  8d 2c 01 
     jsr sub_80bf            ;422d  20 bf 80 
+    ;arm a move: ramp ptr = ramp_ptr_accel[profile mem_0010&0x0F], start Timer2/3 + HE
 
-sub_4230:
+motion_start:
     clb 2,SMCONH            ;4230  5f f8    
     jsr sub_7cf8            ;4232  20 f8 7c 
     lda mem_0010            ;4235  a5 10    
@@ -17322,10 +17323,10 @@ sub_4230:
     asl a                   ;4239  0a       
     clc                     ;423a  18       
     tay                     ;423b  a8       
-    lda mem_443b,y          ;423c  b9 3b 44 
+    lda ramp_ptr_accel,y    ;423c  b9 3b 44 
     sta mem_0038            ;423f  85 38    
     iny                     ;4241  c8       
-    lda mem_443b,y          ;4242  b9 3b 44 
+    lda ramp_ptr_accel,y    ;4242  b9 3b 44 
     sta mem_0039            ;4245  85 39    
     ldy #0x00               ;4247  a0 00    
     lda [mem_0038],y        ;4249  b1 38    
@@ -17513,7 +17514,7 @@ lab_4348:
     asl a                   ;4358  0a       
     clc                     ;4359  18       
     tay                     ;435a  a8       
-    lda mem_4451,y          ;435b  b9 51 44 
+    lda ramp_ptr_decel,y    ;435b  b9 51 44 
     sta mem_0038            ;435e  85 38    
     lda mem_4452,y          ;4360  b9 52 44 
     sta mem_0039            ;4363  85 39    
@@ -17638,8 +17639,9 @@ lab_442b:
     adc mem_0145            ;4435  6d 45 01 
     sta mem_003b            ;4438  85 3b    
     rts                     ;443a  60       
+    ;11 words: accel dwell-stream starts per motion profile
 
-mem_443b:
+ramp_ptr_accel:
     .byte 0x0b              ;443b  0b          DATA 0x0b 
     .byte 0x5a              ;443c  5a          DATA 0x5a 'Z' 
     .byte 0x98              ;443d  98          DATA 0x98 
@@ -17662,8 +17664,9 @@ mem_443b:
     .byte 0x61              ;444e  61          DATA 0x61 'a' 
     .byte 0x0d              ;444f  0d          DATA 0x0d 
     .byte 0x62              ;4450  62          DATA 0x62 'b' 
+    ;11 words: decel dwell-stream starts per motion profile
 
-mem_4451:
+ramp_ptr_decel:
     .byte 0xd2              ;4451  d2          DATA 0xd2 
 
 mem_4452:
@@ -17690,17 +17693,17 @@ mem_4452:
     .byte 0x62              ;4466  62          DATA 0x62 'b' 
 
 sub_4467:
-    bbc 7,mem_0057,lab_44a3 ;4467  f7 57 39 
+    bbc 7,mem_0057,direction_decide ;4467  f7 57 39 
     ldm #0x8c,mem_0028      ;446a  3c 8c 28 
     ldm #0x01,mem_0029      ;446d  3c 01 29 
     ldx #0x3a               ;4470  a2 3a    
     ldy #0x28               ;4472  a0 28    
     jsr sub_492f            ;4474  20 2f 49 
-    beq lab_44a3            ;4477  f0 2a    
+    beq direction_decide    ;4477  f0 2a    
     ldx #0x3a               ;4479  a2 3a    
     ldy #0x28               ;447b  a0 28    
     jsr sub_493b            ;447d  20 3b 49 
-    bcc lab_44a3            ;4480  90 21    
+    bcc direction_decide    ;4480  90 21    
     ldx mem_003a            ;4482  a6 3a    
     stx mem_0026            ;4484  86 26    
     ldx mem_003b            ;4486  a6 3b    
@@ -17719,21 +17722,22 @@ lab_449b:
 
 lab_44a0:
     bbs 7,mem_0010,lab_44a0 ;44a0  e7 10 fd 
+    ;pick LTR/RTL for next pass: mode-forced LTR or distance compare
 
-lab_44a3:
+direction_decide:
     ldm #0x00,mem_0036      ;44a3  3c 00 36 
     ldm #0x00,mem_0037      ;44a6  3c 00 37 
     jsr sub_4861            ;44a9  20 61 48 
     bbc 2,mem_005f,lab_44b2 ;44ac  57 5f 03 
-    jmp sub_4507            ;44af  4c 07 45 
+    jmp sweep_pos_ltr       ;44af  4c 07 45 
 
 lab_44b2:
     bbc 6,mem_005b,lab_44b8 ;44b2  d7 5b 03 
-    jmp sub_4507            ;44b5  4c 07 45 
+    jmp sweep_pos_ltr       ;44b5  4c 07 45 
 
 lab_44b8:
     bbc 7,mem_005b,lab_44be ;44b8  f7 5b 03 
-    jmp sub_4507            ;44bb  4c 07 45 
+    jmp sweep_pos_ltr       ;44bb  4c 07 45 
 
 lab_44be:
     nop                     ;44be  ea       
@@ -17742,21 +17746,21 @@ lab_44be:
     lda #0xff               ;44c1  a9 ff    
     bit mem_0064            ;44c3  24 64    
     beq lab_44ca            ;44c5  f0 03    
-    jmp sub_4507            ;44c7  4c 07 45 
+    jmp sweep_pos_ltr       ;44c7  4c 07 45 
 
 lab_44ca:
     ldx #0x83               ;44ca  a2 83    
     ldy #0x3a               ;44cc  a0 3a    
     jsr sub_493b            ;44ce  20 3b 49 
     bcc lab_44d6            ;44d1  90 03    
-    jmp sub_4507            ;44d3  4c 07 45 
+    jmp sweep_pos_ltr       ;44d3  4c 07 45 
 
 lab_44d6:
     ldx #0x3a               ;44d6  a2 3a    
     ldy #0x85               ;44d8  a0 85    
     jsr sub_493b            ;44da  20 3b 49 
     bcc lab_44e2            ;44dd  90 03    
-    jmp sub_454e            ;44df  4c 4e 45 
+    jmp sweep_pos_rtl       ;44df  4c 4e 45 
 
 lab_44e2:
     ldx mem_0085            ;44e2  a6 85    
@@ -17775,10 +17779,11 @@ lab_44e2:
     ldx #0x28               ;44fc  a2 28    
     ldy #0x26               ;44fe  a0 26    
     jsr \sub_ff0c           ;4500  22 0c    
-    bcc sub_4507            ;4502  90 03    
-    jmp sub_454e            ;4504  4c 4e 45 
+    bcc sweep_pos_ltr       ;4502  90 03    
+    jmp sweep_pos_rtl       ;4504  4c 4e 45 
+    ;position for L-to-R pass; leaves SMCONH.1 clear; overshoot on wrong-side approach
 
-sub_4507:
+sweep_pos_ltr:
     ldx mem_0083            ;4507  a6 83    
     stx mem_0026            ;4509  86 26    
     ldx mem_0084            ;450b  a6 84    
@@ -17817,8 +17822,9 @@ lab_4522:
     stx mem_0037            ;4549  86 37    
     clb 1,SMCONH            ;454b  3f f8    
     rts                     ;454d  60       
+    ;position for R-to-L pass; leaves SMCONH.1 set; mirror of sweep_pos_ltr
 
-sub_454e:
+sweep_pos_rtl:
     ldx mem_003a            ;454e  a6 3a    
     stx mem_0026            ;4550  86 26    
     ldx mem_003b            ;4552  a6 3b    
@@ -17984,12 +17990,12 @@ sub_465c:
     ora #0x06               ;4660  09 06    
     sta mem_0010            ;4662  85 10    
     seb 5,mem_0010          ;4664  af 10    
-    jsr sub_4230            ;4666  20 30 42 
+    jsr motion_start        ;4666  20 30 42 
     rts                     ;4669  60       
 
 lab_466a:
     seb 5,mem_0010          ;466a  af 10    
-    jsr sub_4230            ;466c  20 30 42 
+    jsr motion_start        ;466c  20 30 42 
 
 lab_466f:
     jsr sub_7e6d            ;466f  20 6d 7e 
@@ -38957,8 +38963,9 @@ lab_bc00:
     bne lab_bbe5            ;bc28  d0 bb    
     clb 0,mem_005a          ;bc2a  1f 5a    
     jmp main_loop           ;bc2c  4c 33 85 
+    ;undoc ESC EM 'F' n: resident font by descriptor index -> mem_0059
 
-lab_bc2f:
+em_font_select:
     jsr \sub_ff87           ;bc2f  22 87    
     bbs 1,mem_0055,lab_bc7c ;bc31  27 55 48 
     pha                     ;bc34  48       
@@ -39006,8 +39013,9 @@ lab_bc79:
 
 lab_bc7c:
     jmp main_loop           ;bc7c  4c 33 85 
+    ;undoc ESC EM 'S' n: double-height/size via ESC w apply paths
 
-lab_bc7f:
+em_size_select:
     jsr \sub_ff87           ;bc7f  22 87    
     cmp #0x00               ;bc81  c9 00    
     beq lab_bca4            ;bc83  f0 1f    
@@ -39063,17 +39071,17 @@ lab_bcc5:
     cmp #0x52               ;bcd5  c9 52    
     beq lab_bd00            ;bcd7  f0 27    
     cmp #0x54               ;bcd9  c9 54    
-    beq lab_bd0c            ;bcdb  f0 2f    
+    beq em_asf_topskip      ;bcdb  f0 2f    
     cmp #0x43               ;bcdd  c9 43    
     beq lab_bd09            ;bcdf  f0 28    
     cmp #0x46               ;bce1  c9 46    
     bne lab_bce8            ;bce3  d0 03    
-    jmp lab_bc2f            ;bce5  4c 2f bc 
+    jmp em_font_select      ;bce5  4c 2f bc 
 
 lab_bce8:
     cmp #0x53               ;bce8  c9 53    
     bne lab_bcef            ;bcea  d0 03    
-    jmp lab_bc7f            ;bcec  4c 7f bc 
+    jmp em_size_select      ;bcec  4c 7f bc 
 
 lab_bcef:
     jmp main_loop           ;bcef  4c 33 85 
@@ -39097,8 +39105,9 @@ lab_bd06:
 
 lab_bd09:
     jmp cmd_esc_r           ;bd09  4c b5 9e 
+    ;ESC EM 'T' n: ASF top-of-page skip = default + (n-6)*72 steps
 
-lab_bd0c:
+em_asf_topskip:
     jsr \sub_ff87           ;bd0c  22 87    
     bbc 7,mem_0052,lab_bd06 ;bd0e  f7 52 f5 
     and #0x0f               ;bd11  29 0f    
@@ -45625,11 +45634,11 @@ lab_e38b:
 lab_e38f:
     jsr sub_4861            ;e38f  20 61 48 
     bbc 5,mem_009f,lab_e39a ;e392  b7 9f 05 
-    jsr sub_4507            ;e395  20 07 45 
+    jsr sweep_pos_ltr       ;e395  20 07 45 
     bra lab_e39d            ;e398  80 03    
 
 lab_e39a:
-    jsr sub_454e            ;e39a  20 4e 45 
+    jsr sweep_pos_rtl       ;e39a  20 4e 45 
 
 lab_e39d:
     jmp lab_e370            ;e39d  4c 70 e3 

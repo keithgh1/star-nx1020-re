@@ -17,7 +17,7 @@ DC4=9DC8 CAN=A010 ESC=dispatch C0BF/C1BC).
 | `^0C` | ESC FF | 96D6 | (ignored) |
 | `^0E` | ESC SO one-line double-width | 9DC3 | 9DC3 |
 | `^0F` | ESC SI condensed | 98F9 | 9A0B |
-| `^19` | ESC EM paper/ASF ctl | BCC0 | BCC0 |
+| `^19` | ESC EM paper/ASF ctl (subcommand dispatch, incl. undocumented - see "ESC EM subcommands" below) | BCC0 | BCC0 |
 | `^1A` | ESC SUB repeat char (IBM) | C042 | C042 |
 | ` ` | ESC SP intercol space | AA07 | - |
 | `!` | ESC ! master print mode | 9715 | (ignored) |
@@ -90,3 +90,25 @@ DC4=9DC8 CAN=A010 ESC=dispatch C0BF/C1BC).
 | `x` | ESC x draft/LQ select | 9941 | (ignored) |
 | `z` | ESC z (?) | 9977 | 9977 |
 | `~` | ESC ~ (?) | A01E | (ignored) |
+
+## ESC EM subcommands (dispatch @0xBCC5) - traced Aug 2026
+
+Gate: **mem_0052 bit 7 = "ASF installed"** (EDS switch A-4 OFF); every ASF subcommand is
+ignored when clear. **mem_0052 bit 6 = "ASF selected"** (consumed at the paper-load /
+form-feed / feed-sequence decision points 0x8674, 0x926D, 0x96B2, 0xD4EE; bit 7 itself is
+checked at ~45 sites across the feed engine).
+
+Documented in the users manual (p85-86):
+| n | Function | Firmware |
+|---|----------|----------|
+| 0 / '0' | Deselect ASF (manual feed) | `clb 6,mem_0052` |
+| 4 / '4' | Select ASF | `seb 6,mem_0052` |
+| 'R' | Eject current sheet | `jmp ctl_FF` (form-feed path ejects when ASF selected) |
+| 'T' n | Skip n/6 inch at top of ASF page (n = 1-15) | @0xBD0C: feed distance = ROM default (mem_8128/29) + (n-6) x 72 steps (72 steps = 1/6"); n masked to 4 bits, 0 treated as 1 |
+
+UNDOCUMENTED extensions (not in the users manual):
+| n | Function | Firmware |
+|---|----------|----------|
+| 'C' n | Color select - alias of `ESC r n` | `jmp cmd_esc_r` |
+| 'F' n | Resident font select by descriptor index | @0xBC2F: accepts '0'-'9' (masked) or raw index < 0x40; looks up the descriptor table at DME 0x8010 (bank via `sub_f676`), rejects 0xFF entries, stores (id - 3) into mem_0059 bits 0-2, applies via sub_9E0B |
+| 'S' n | Double-height / size control | @0xBC7F: n bit 0 -> mem_0063.0 + mem_007b.3; n bit 1 routes into `cmd_esc_w`'s ON (0xA19E) / OFF (0xA1C5) apply paths |

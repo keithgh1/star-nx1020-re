@@ -15,7 +15,7 @@ Sources: ✅ datasheet (Mitsubishi_justM50734.pdf), ✅ ROM2 firmware, ✅ techn
 | 0xF0 / 0xF1 | P2 / P2DIR | Port P2 data / direction (stepper motors) |
 | 0xF2 / 0xF3 / 0xF4 | P1IN / P1 / P1DIR | Port P1 latched-input / data / direction |
 | 0xF5 / 0xF6 / 0xF7 | P0FUNC / P0 / P0DIR | Port P0 function / data / direction |
-| 0xF8 / 0xF9 | SMCONH / SMCONV | Stepper-motor control H (carriage) / V (line-feed) |
+| 0xF8 / 0xF9 | SMCONH / SMCONV | Stepper-motor control H (carriage) / V (line-feed). SMCONH bit 1 = carriage direction: clear = left-to-right pass, set = right-to-left (render code keys column reversal off it) |
 | 0xFC | WDT | Watchdog timer (write 0xFF to kick) |
 | 0xFD / 0xFE / 0xFF | ICON3 / ICON2 / ICON1 | Interrupt control registers |
 

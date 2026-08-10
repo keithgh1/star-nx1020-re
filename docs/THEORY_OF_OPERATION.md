@@ -245,8 +245,20 @@ bit7, and OR-ing in descender/9th-pin bits. Result → `mem_000d`.
   when the horizontal counter expires, complementing the Timer1/2/3 pacing.
 - At end of line, `carriage_step` (@0xD929) pulses SMCONH to park/reverse; a RAM motor routine
   handles phase dwell/settle.
-- 🔶 **Bidirectional printing**: an `ESC U` / unidirectional flag exists; logic-seeking and the
-  column-order reversal for right-to-left passes are implied but ❓ not yet traced.
+- **Bidirectional / logic-seeking** ✅ (traced): `cmd_esc_U` @0xA965 sets **mem_005b bit 6**
+  (unidirectional). The end-of-line **direction decision** @0x44A3-0x4504 (ROM1) forces the
+  left-to-right positioner when unidirectional (or mem_005b.7 - a per-sweep mode-derived
+  force, from bit 4 of the mode byte built @0x87CA - or mem_005f.2 / mem_0064 conditions);
+  otherwise it compares 16-bit distances from the current carriage position (mem_0083/84) to
+  the next pass's start (mem_003a/3b) and end (mem_0085/86), with a doubled-distance cost
+  term, and starts the pass from whichever end is cheaper = true logic-seeking.
+- **Pass positioners** `sweep_pos_ltr` @0x4507 / `sweep_pos_rtl` @0x454E (mirror images):
+  move to the pass start and leave **SMCONH bit 1 = direction bit** clear (LTR) / set (RTL).
+  When approaching from the wrong side each overshoots and re-approaches, so the final
+  approach direction is constant = backlash compensation for inter-pass column registration.
+- **Column reversal** is keyed directly off SMCONH bit 1: ~18 `bbs/bbc 1,SMCONH` tests in the
+  render code (0xE3xx-0xFExx) select forward vs backward line-buffer walking (e.g. @0xF8A2:
+  parameter index 0x02 forward, 0x0A reversed).
 
 ---
 
@@ -270,12 +282,37 @@ bit7, and OR-ing in descender/9th-pin bits. Result → `mem_000d`.
   them in `mem_0032/0033` (peeking ahead in the buffer), then computes **total = count × per-line
   spacing** by repeated 16-bit add into `mem_003d/003e`. `sub_d69d` copies that total into the motor
   counter `mem_0041/0042`, **adds a constant 0x48 = 72-step (1/6") ramp/overhead allowance**,
-  asserts SMCONV, and the timer ISR steps the motor along an **acceleration/dwell profile** (the
-  long ramp tables in **ROM1 0x05A42–0x06243**, indexed via `sub_d7e1`) until the count hits zero.
+  asserts SMCONV, and the timer ISR steps the motor along an **acceleration/dwell profile**
+  (the ramp streams in **ROM1 ~0x5A0B–0x63xx** - see §9a) until the count hits zero.
+  (Earlier note "indexed via sub_d7e1" was wrong: that routine is a separate Timer-X-paced
+  slow-feed; the ramp indexer is `motion_start` @0x4230.)
+
+### 9a. Motor accel/decel ramp tables ✅ (decoded)
+- **11 motion profiles**, selected by move type/length into the low nibble of `mem_0010`
+  (e.g. @0x45CF: moves < 0x30 steps run un-ramped on direct timer values @`sub_467b`;
+  0x30–0xE7 → profile 7; ≥ 0xE8 → profile 1; profile 0/0xA are the long-move profiles;
+  profiles 6/8 are used by the special feed paths @0x4622/`sub_465c`).
+- **Pointer tables in ROM1**: accel starts @**0x443B** (11 little-endian words: 0x5A0B,
+  0x5B98, 0x5CA9, 0x5DB8, 0x5DBA, 0x5EC9, 0x5FD8, 0x6061, 0x60B4, 0x6102, 0x620D), decel
+  starts @**0x4451** (0x5AD2, 0x5C21, 0x5D31, 0x5DB9, 0x5E42, 0x5F51, 0x601D, 0x608B,
+  0x60DC, 0x6188, 0x62D4). Accel/decel streams interleave in memory; stream lengths run
+  ~38 bytes (short profiles 7/8) to ~199 bytes (long profiles 0/0xA).
+- **Format: a byte stream of dwell-tick counts per excitation stage** (not raw periods).
+  `motion_start` @0x4230 loads the profile's accel pointer into `mem_0038/39`, index
+  `mem_0128`, first count into `mem_00ba`, and arms Timer2/3 + the HE interrupt. Each timer
+  tick decrements `mem_00ba`; at zero the ISR fetches the next byte as the new dwell count
+  (minus 6 when `mem_00b9` bit 5 is set), reloads Timer2 from the working pair
+  `mem_0146-0149`, and advances the stage counter `mem_00b9` - which also sequences the
+  motor-common voltage switch (P3.0/P3.1) during the profile. Long/short dwells alternate
+  and shrink as the motor accelerates, converging to equal dwells at cruise; the pointer is
+  re-aimed at the decel stream (@0x435A) for the final approach. Cruise Timer2
+  prescale/reload pairs per profile live in the small table @0x4285 (PRE2=1, T2=0x0A…0x26).
+- Per-stage excitation semantics (which dwell maps to which phase pattern) were not fully
+  mapped; the structural decode above is verified against the indexer and ISR consumption.
 - **Page/form control**: `ESC C` page length, `ESC N/O` skip-perforation, VTAB channels (`ESC B`),
   paper-out detect (`ESC 8/9`), ASF/paper control (`ESC EM`) set state the feed path honors.
-  🔶 The exact accel-ramp table contents remain to confirm. (Sensor identities are settled:
-  P0.6 = paper-end sensor, P3.7 = On Line button - see PORT_MAP.md.)
+  (Sensor identities are settled: P0.6 = paper-end sensor, P3.7 = On Line button - see
+  PORT_MAP.md. Ramp tables decoded - see §9a.)
 
 ---
 
@@ -305,18 +342,35 @@ fatal error trap. Matches manual p25.
    handshake). Remaining detail: exact NLQ two-pass interleave vs. alternate-sweep, and the precise
    HD0–9 wiring order (the shift-register bit order).
 4. **Line-feed quantization** ✅ RESOLVED - see §9 (1/432" unit = 1 micro-step = 432 steps/inch;
-   CR/LF coalescing × spacing; `sub_d69d` + 72-step ramp allowance). Remaining detail: the
-   accel-ramp table contents in ROM1 0x05A42–0x06243.
+   CR/LF coalescing × spacing; `sub_d69d` + 72-step ramp allowance; ramp tables decoded in
+   §9a).
 
 3. **Carriage-home seek** ✅ RESOLVED - `home_seek` @0xD840 (see §1.7 / §8): P0.7 home flag,
    step budget, debounce, reverse/retry, edge-align. No encoder exists.
 5. **Sensor map** ✅ RESOLVED (schematic trace, Aug 2026) - P0.0 release switch, P0.2 tractor
    switch, P0.6 paper-end sensor, P0.7 home interrupter, P3.3–3.7 panel buttons, P4.3
-   thermistor. Full pin-level detail in PORT_MAP.md. (ASF command path still untraced.)
+   thermistor. Full pin-level detail in PORT_MAP.md.
 6. **HE vs VE distinction** ✅ RESOLVED - datasheet: HE/VE are the internal Horizontal
    (SMCONH/carriage) and Vertical (SMCONV/paper) stepper-counter-empty interrupts.
 
-Still open (not yet traced):
-2. **Bidirectional / logic-seeking** ❓ - direction decision, column reversal, dot-timing comp.
+2. **Bidirectional / logic-seeking** ✅ RESOLVED - see §8: ESC U flag mem_005b.6; decision
+   @0x44A3 (distance-compare logic-seek, mode-forced LTR); `sweep_pos_ltr`/`sweep_pos_rtl`
+   @0x4507/0x454E with backlash-normalized approach; column reversal keyed off SMCONH bit 1.
+
+7. **ASF (`ESC EM`) command path** ✅ RESOLVED - dispatch @0xBCC5 (see ESC_COMMANDS.md for
+   the full subcommand table). mem_0052.7 = ASF installed (EDS A-4), gating ~45 feed-engine
+   sites; mem_0052.6 = ASF selected (EM 0/4), consumed at the load/eject/feed decision points
+   (0x8674, 0x926D, 0x96B2, 0xD4EE); EM R ejects via the FF handler; EM T n sets the load
+   feed to ROM-default + (n-6)x72 steps. Three undocumented subcommands found: EM C (color,
+   aliases ESC r), EM F (font by descriptor index -> mem_0059), EM S (double-height/size via
+   the ESC w apply paths).
+
+8. **Accel-ramp tables** ✅ RESOLVED - see §9a: 11 profiles × accel/decel dwell-count
+   streams @ROM1 ~0x5A0B–0x63xx, pointer tables @0x443B/0x4451, consumed by the timer ISR
+   via mem_0038/39 + mem_0128 with mem_00ba as the running dwell countdown.
+
+Nothing on the open list remains untraced. Remaining depth is optional detail: per-stage
+excitation semantics of the ramp streams, and the NLQ two-pass interleave / HD0-9 shift
+order noted under item 1.
 
 These are the spots to either trace further in the firmware or verify against the technical manual.

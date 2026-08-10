@@ -59,7 +59,7 @@ via the DME/font path).
 |------|------|
 | 0x00000–0x07FFF | ✅ **Orator + Script 16-dot NLQ glyph data** (planar). Reached via bank2 metrics tables 0x168f1+/0x17471+ with map `file = ptr-0x8000`. Orator=bold caps, Script=cursive. Sheets: FONT_orator.png / FONT_script.png. (0x04000–0x07FFF still doubles as CPU code in program space - the glyph reads use the DME/font path.) |
 | 0x04000–0x05645 | ✅ **CPU code** (ISRs @CPU 0x4965/0x501A/0x5046/0x5057/0x505F; core routines e.g. get_rx_byte@64B7) |
-| 0x05A42–0x06243 | 🔶 lookup tables - long monotone ramp sequences (motor accel / dot-timing?) ❓ |
+| ~0x05A0B–0x063xx | ✅ **motor accel/decel ramp streams** - 11 profiles x 2 (accel @ptr table 0x443B, decel @0x4451), byte streams of per-stage dwell-tick counts consumed by the timer ISR (see THEORY §9a) |
 | 0x06BDB–0x071DC | ✅ **EDS self-test menu TEXT** (human-readable): `EDS SETTINGS`, Emulation STANDARD, RAM Usage, Auto-LF, ASF, Print Mode (10cpi Draft/HS-Draft/17cpi/COURIER), Page Length, Character Table, **International Char Sets** (USA/Denmark/France/Sweden/Germany/Italy/England/Spain), **IBM Code Pages** (#437/#863/#850/#865/#860/#861) |
 | 0x07455–0x074xx | ✅ self-test sample text: `0123456789`, `*** This is first line. ***`, `*** This is line` |
 

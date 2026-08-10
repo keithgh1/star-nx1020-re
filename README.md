@@ -54,6 +54,25 @@ pitch variants and the accent and box-graphics extended sets.
 |---|---|---|
 | ![Draft](deliverables/FONT_draft.png) | ![Sanserif](deliverables/FONT_sanserif.png) | ![Script](deliverables/FONT_script.png) |
 
+## Undocumented features
+
+Star's manuals document the `ESC EM` command with exactly four subcommands (`0`, `4`, `R`,
+`T n` - all automatic-sheet-feeder control). The firmware's dispatcher quietly accepts three
+more, found in neither the users manual nor the technical manual:
+
+| Sequence | What it does |
+|---|---|
+| `ESC EM C n` | Selects the print color - a hidden alias of `ESC r n` |
+| `ESC EM F n` | Selects a resident font directly by its internal descriptor index, bypassing the documented `ESC k` typeface list |
+| `ESC EM S n` | Double-height / size control, routing into the `ESC w` machinery with an extra mode flag |
+
+Handler addresses and decoded semantics are in [docs/ESC_COMMANDS.md](docs/ESC_COMMANDS.md).
+
+And one find outside the printer itself: the M50734 CPU datasheet contains a period
+misprint - its interrupt vector table lists INT1 for two different vectors. The schematic,
+the firmware's behavior, and the datasheet's own register diagrams pin down the real
+assignment (see [docs/PORT_MAP.md](docs/PORT_MAP.md)).
+
 ## How it was done
 
 1. **ROM dumps and hardware survey.** Two ROMs were dumped from the board: a 32 KB firmware
@@ -73,8 +92,9 @@ pitch variants and the accent and box-graphics extended sets.
    foundation, but the analysis this job required went beyond its scope - so it was extended
    with control files, value-tracking analysis, cross-references, and machine-readable
    reports, becoming **[m740recon](https://github.com/keithgh1/m740recon)**. With it, the
-   firmware was fully mapped: 635 routines, the interrupt architecture (handlers installed
-   into RAM at boot), and the complete ESC/P + IBM command dispatch.
+   firmware was fully mapped: 635 routines, the interrupt architecture (handlers resident
+   in the font ROM's system region, mapped into CPU space), and the complete ESC/P + IBM
+   command dispatch.
 
 4. **Targeted simulation.** Where static analysis hit its limits - glyph addresses assembled
    from runtime state - a minimal M740 interpreter with the printer's banked memory model was
