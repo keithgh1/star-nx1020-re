@@ -13,11 +13,24 @@ mechanism; the few corrections it supplied are folded in and marked inline.
 ## 0. Hardware at a glance ✅
 - **CPU**: Mitsubishi **M50734** (740-family, 6502-derived), 64-pin, external bus, no internal
   memory. Drives ports P0–P4, three timers, a UART, and a 4-phase stepper-motor controller.
+  **Clocked at 10 MHz** ✅ - the service manual's scope-waveform page (p111) captions its
+  first trace "(1) Crystal (10 MHz), Pin 30 of IC8", and pin 30 is Xin. XTAL1 on the parts
+  list is a ceramic resonator (EFO-W4914B5). The datasheet part for that speed is the
+  **M50734SP-10**; the internal clock is Xin/4 = 2.5 MHz, which matches the datasheet's
+  quoted 0.8 µs minimum instruction time.
 - **ROM2 (IC6, 27256, 32 KB)** = firmware, mapped at CPU **0x8000–0xFFFF**.
-- **RAM (IC5, 32 KB SRAM)** = CPU **0x0000–0x3FFF** (program space, DME off). Holds variables,
-  line/print buffers, the host receive ring buffer, and the download-font area (0x0240).
+- **RAM (IC5, 32 KB SRAM)** = CPU **0x0000–0x3FFF**. Holds variables, line/print buffers,
+  the host receive ring buffer, and the download-font area (0x0240).
   CPU **0x4000–0x7FFF** is **ROM1 system code** (the ISRs + core real-time routines live
   there, in ROM - not copied to RAM).
+  ✅ **Only 16 KB of the 32 KB part is decoded, and it answers in BOTH memory spaces** - the
+  same bytes are visible with DME off and with DME on. Proof on the boot path: `sub_84ea`
+  builds the synthetic power-on command stream and stores it with `sta mem_0320,y`
+  (absolute,Y = program space); the read pointer is then set to 0x0320 at 0x852A/0x852D, and
+  `lab_6575` reads the stream back with `lda [mem_0000,x]` (indirect = data space). If the two
+  spaces held different RAM the printer would consume garbage at every power-on.
+  The power-on RAM test (0xAA at 0x3FFF with DME off, 0x55 with DME on) therefore proves
+  "RAM answers in both spaces", not "there are two 16 KB halves".
 - **ROM1 (IC7, D27C1001, 128 KB)** = font + system data. It is **not** in CPU address space;
   it sits on a separate **MA0–MA16** bus behind the gate array and is read through the
   **DME** (Data Memory Enable) data window when P0.5=DME is asserted.
@@ -27,13 +40,47 @@ mechanism; the few corrections it supplied are folded in and marked inline.
   paper advanced by the **line-feed stepper (SMCONV)**. Sensors: **home-position
   photo-interrupter on P0.7** (HIGH = at home; used only by the home-seek - there is no
   carriage encoder, sweeps are open-loop timer-paced), **paper-end reflective sensor on P0.6**
-  (HIGH = paper present), **release / tractor leaf switches on P0.0 / P0.2** (the pair encodes
+  (✅ **HIGH = paper END**, LOW = paper present - corrected Aug 2026, see PORT_MAP.md),
+  **release / tractor leaf switches on P0.0 / P0.2** (the pair encodes
   friction / push-tractor / pull-tractor; both-HIGH is the manual's error state - PORT_MAP.md).
 - **EEPROM (IC9, BR93C46)**: stores the EDS (Electronic DIP Switch) panel settings; serial
   interface bit-banged on **P1** (P1.0=CS, P1.1=SK, P1.2=DI, P1.4=DO).
 - **Host interface**: Centronics parallel - data latched by the **gate array** at STROBE-fall,
   **BUSY/ACK/PE/SEL/ERR** out via LS05 buffers; /IN-PRIME (pin 31) → P0.1//INT2. (The CPU's
   UART TxD/RxD functions are unused; the serial option is an external converter box.)
+
+### 0a. The two memory spaces ✅ (Aug 2026)
+
+```
+                program space (DME low)          data space (DME high)
+0x0000-0x3FFF   RAM (IC5)                        the SAME RAM
+0x4000-0x4003   ROM1 file 0x04000-0x04003        D65006 gate array reg0..reg3
+0x4004-0x7FFF   ROM1 file 0x04004-0x07FFF        ROM1, same bytes
+0x8000-0xFFFF   ROM2 firmware v3.2               32 KB banked window into ROM1
+```
+
+**The data space is reached only through the indirect addressing modes** - `(zp,X)` and
+`(zp),Y`. Zero page, absolute and absolute-indexed always read the program space whatever
+DME is doing, which is why the firmware can leave DME asserted and still read ROM2 tables,
+and why the SFRs never disappear. Full note in PORT_MAP.md.
+
+**At reset the 0x8000-0xFFFF window shows ROM1 file 0x08000-0x0FFFF** - the second of the
+four 32 KB quarters, i.e. the v3.0 firmware copy that ROM_MAP.md calls bank 1. That quarter
+is **uniquely determined**: it is the only one of the four that satisfies all three window
+reads the boot path makes.
+
+| boot-path read | requirement | q0 | **q1** | q2 | q3 |
+|---|---|---|---|---|---|
+| 0x800F - option-ROM probe @0x8251, `cmp #0x43` | must NOT be 'C' | 0x02 | **0xA0** | 0xFF | 0xF0 |
+| 0xC063 - the control-code table `ctrl_lookup` fetches | must equal ROM2's table at 0xC063 | 0/64 | **64/64** | 0/64 | 0/64 |
+| 0x8100 - source of the power-on command stream | must be the leading NUL run | no | **yes** | no | no |
+
+🔶 The bank *select* mechanism appears to be gate-array **reg2 bits 7-6** (the reset value
+reg2 = 0xD0 gives bank 3), with quarter = `(bank + 2) & 3`. That formula reproduces the reset
+case exactly, but it rests on this single anchor - it has **not** been confirmed against the
+font descriptor blocks, whose byte 3 reads 0x00 for all four resident faces. Treat the
+register field and the +2 offset as inference; the "quarter 1 at reset" result above is
+established.
 
 ---
 

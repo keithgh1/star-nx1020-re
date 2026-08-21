@@ -10,6 +10,20 @@ Status legend: ✅ verified · 🔶 strong inference · ❓ needs drill-down
 - **IC7 D27C1001 (128 KB) = `ROM1`** - dual-purpose: its `0x4000–0x7FFF` appears in CPU program
   space (above); the font/glyph data is read via the **DME data space** (P0.5) through the gate
   array (MA0–MA16 bus). ✅
+- ✅ **The DME window is at data-space `0x8000–0xFFFF` and is 32 KB wide**, i.e. one of the four
+  quarters of ROM1 at a time. **At reset it shows file `0x08000–0x0FFFF`** (bank 1 below - the
+  v3.0 firmware copy), and that is *uniquely* determined: it is the only quarter for which
+  all three window reads on the boot path come out right -
+  `0x800F` is not `'C'` (option-ROM probe at 0x8251 must fail),
+  `0xC063` matches ROM2's control-code dispatch table byte-for-byte over 64 bytes
+  (`ctrl_lookup` @0xC2C0 fetches it through the window), and
+  `0x8100` is the run of NULs at the head of the power-on command stream.
+  See THEORY_OF_OPERATION.md §0a for the table.
+  🔶 The bank field looks like gate-array **reg2 bits 7-6** with quarter = `(bank + 2) & 3`
+  (reset leaves reg2 = 0xD0 → bank 3 → quarter 1), but that mapping rests on the single reset
+  anchor and is **not** corroborated by the font descriptor blocks - byte 3 of all four
+  descriptors at 0x10110/0x10150/0x10190/0x101D0 reads 0x00, so the "rec byte3 & 3 = bank"
+  note further down needs re-checking.
 - IC4 LS373 = AD latch; IC9 BR93C46 = serial EEPROM (live EDS settings). ✅
 
 ---
@@ -29,7 +43,8 @@ Note: 0x5057 (RI/INT1) is an unused-source error trap; 0x505F (INT2) = host /IN-
 ### Structure (file offsets) ✅
 | file | CPU | size | kind |
 |------|-----|------|------|
-| 0x0000–0x012F | 8000–812F | 304 B | DATA - header/jump table at reset region |
+| 0x0000–0x007F | 8000–807F | 128 B | ✅ **factory default EDS record** - 64 big-endian 16-bit words. `sub_7841` copies all 64 to EEPROM words 0x00–0x3F whenever the stored settings fail their signature check, so a blank BR93C46 self-initialises. Word 0x3F = `0x807E/0x807F` = **`4E 03`** is the signature the reset path compares against at 0x81D1/0x81D9 |
+| 0x0080–0x012F | 8080–812F | 176 B | DATA - header/jump table at reset region |
 | 0x0130–0x0761 | 8130–8761 | 1586 B | CODE - **reset/init** (stack, WDT, RAM test, port setup) |
 | 0x0762–0x1480 | … | mixed | CODE with small DATA tables interleaved |
 | ~0x1480–0x3844 | … | large | many DATA tables (incl. 0x242E–0x2B47, 0x2C28–0x3844) interleaved with code ❓ |

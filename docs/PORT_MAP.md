@@ -30,8 +30,8 @@ Init: `P0FUNC=0x20` (only P0.5 = DME special), `P0DIR=0x38` (P0.3/4/5 outputs, r
 | 2 | port, in | **/TRACTOR** tractor-position leaf switch (same pullup + series circuit as bit 0). Open = HIGH = tractor up (pull-tractor); closed = LOW = tractor down (push-tractor) (manual p36). CNTR special function unused. |
 | 3 | BUSYOUT | Centronics BUSY (via LS05, CPU pin 41) |
 | 4 | STBOUT | print-head energize strobe: drive LOW to fire; `STBT` (Timer S, 0xFA) sets the solenoid pulse width |
-| 5 | DME | data-memory enable: gates the 2nd 64K data space = gate-array + font-ROM window |
-| 6 | port, in | **PE** paper-end reflective sensor. LED always on (220R to GND); phototransistor emitter output into P0.6. **HIGH = paper present.** TxD special function unused. |
+| 5 | DME | data-memory enable: gates the 2nd 64K data space = gate-array + font-ROM window. **Only the indirect addressing modes reach that space** - see the note under "Gate array" below |
+| 6 | port, in | **PE** paper-end reflective sensor. LED always on (220R to GND); phototransistor emitter output into P0.6. **HIGH = paper END / LOW = paper present** ✅ (corrected Aug 2026 - see note below). TxD special function unused. |
 | 7 | port, in | **HP** home-position photo-interrupter (pullup on phototransistor collector). **HIGH = beam blocked = carriage shield at home.** Polled only by the home-seek routine (`sub_d840`); there is no carriage encoder - sweep pacing is open-loop, timer-driven. RxD special function unused. |
 
 The release/tractor pair encodes the paper-feed mode (manual Fig. 2-23, p35):
@@ -46,6 +46,21 @@ The release/tractor pair encodes the paper-feed mode (manual Fig. 2-23, p35):
 Checked throughout the feed/print code (~28 sites). The frequent paired tests that branch
 away when either bit is HIGH (e.g. 0x9666, 0xC7E0, 0xCD53) are "not push-tractor" checks:
 push-tractor is the only both-LOW state.
+
+### ✅ P0.6 polarity - CORRECTED (Aug 2026)
+An earlier revision of this file read "HIGH = paper present". The firmware says the opposite.
+`main_loop` @0x8485 does `bbc 6,P0,lab_848e`: it **skips** the paper-out handling when P0.6 is
+CLEAR and only falls into it when P0.6 is SET (then gated on the ASF flag `mem_0052.7` and the
+"paper-out detector disabled" flag `mem_0056.5`, before landing on `lab_84c2`, which sets
+`mem_005f.4` / `mem_005d.5` and calls `sub_c784`). So **P0.6 HIGH = paper end**.
+
+Confirmed by executing the firmware with P0.6 forced both ways: driven LOW, the printer
+reaches `lab_848e` and settles into its idle host poll at 0x6543; driven HIGH, it reaches
+neither and enters the paper-out state at 0x84C2 instead.
+
+(The schematic Fig. 2-25 sense reads the opposite way round at the phototransistor emitter, so
+there is an inversion somewhere between sensor and pin that the schematic trace has not yet
+pinned down. The firmware behaviour is unambiguous, and it is what the printer acts on.)
 
 ## Port P1 (0xF3, in-latch 0xF2, dir 0xF4) - EEPROM serial interface ✅
 The BR93C46 EEPROM (IC9) is bit-banged on P1. Init `P1DIR=0x07` (P1.0-2 out, P1.3-7 in).
@@ -135,6 +150,47 @@ path @0x7D55. It is NOT the host-receive path - host bytes are polled from the g
   (status), `ff3a`=cached reg1.
 - **STBT** (Timer S, 0xFA) = head-strobe pulse width. Init writes `0xAA/0x55` to reg0 =
   print-head shift-register test.
+
+### ✅ DME is scoped to the indirect addressing modes (Aug 2026)
+On the M50734 only `(zp,X)` and `(zp),Y` (and `JMP (abs)`, unused here) perform a *data* bus
+cycle that DME can redirect. Zero page, zero-page-X, absolute, absolute-X/Y, immediate and
+the stack **always** address the program space, whatever DME is doing. That is why:
+- every gate-array access is written as `lda/sta [mem_00ae],y` rather than `lda $4000`;
+- the power-on RAM test uses an indirect pointer (`mem_0026:27 = 0x3FFF`) rather than
+  `lda $3FFF`, and can therefore test the same address in both spaces;
+- the SFRs stay reachable - `clb 5,P0FUNC` at 0x7CFA is a zero-page RMW and is unaffected by
+  the DME state it is in the middle of changing;
+- code can leave DME asserted and still read ROM2 constant tables with absolute,Y.
+
+DME on/off idioms: `sub_7cf5` = `seb 5,P0FUNC` (**on**); `sub_7cf8` = `seb 5,P0` then
+`clb 5,P0FUNC` (**off**, leaving the pin driven high as a plain port output). The same
+two-instruction "off" idiom appears inline at 0x49FB/0x49FD, 0x65E8/0x65EA and 0x8380/0x8382.
+
+### ✅ Gate array reg3 bits 0-2 = the three front-panel lamps (Aug 2026)
+Every fatal error handler ends in a loop that XORs a 3-bit mask into reg3 and writes it back,
+which is how the printer blinks its error code. The six masks, read straight out of the ROM,
+pair one-for-one with the six error indications in the service manual's troubleshooting table
+(p58), and the pairing is self-consistent across all six - the number of bits in each mask
+matches the number of lamps named, and the bit positions agree everywhere:
+
+**reg3 bit 0 = POWER, bit 1 = ON LINE, bit 2 = QUIET.**
+
+| Trap | blink loop | `eor` mask | lamps blinking | fault | reached from |
+|------|-----------|-----------|----------------|-------|--------------|
+| `lab_7d55` | `lab_7dc3` | 0x05 | POWER + QUIET | **CR home position error** | `0xD95E` (home_seek fail), `0x505B` (`isr_ri_int1`), 0xF1BB, 0xF1D2 |
+| `lab_7d5c` | `lab_7dd2` | 0x02 | ON LINE | **head temperature error** | `0xD9A2` (thermistor >= 0xFC or < 0x04) |
+| `lab_7d63` | `lab_7de1` | 0x01 | POWER | **CR motor error** | `0x4C43` (PHASECNT bit 0 clear at end of a carriage move) |
+| `lab_7d6a` | `lab_7df0` | 0x04 | QUIET | **RAM check error** | `0x81A5` (0x3FFF read-back test) |
+| `lab_7d71` | `lab_7dff` | 0x06 | ON LINE + QUIET | **EE-PROM check error** | `0x81E2` (settings signature, after 2 tries) |
+| `lab_7d78` | `lab_7e0e` | 0x07 | POWER + ON LINE + QUIET | **colour ribbon error** (by elimination) | `0x47EF` |
+
+All six share the prologue `sub_7d7f` (head off, motors off, ICON masks cleared, P2 = 0,
+long beep) and then blink forever, kicking the watchdog. `beep_tone` @0x6466 preserves these
+bits with `and #0x07` before it borrows reg0 for the tone, which corroborates that bits 0-2
+are the only state in reg3 that has to survive.
+
+These masks are the fastest way to diagnose a stuck boot: watch the reg3 writes and the mask
+tells you which check failed.
 - **Carriage homing**: `home_seek` (`sub_d840`) checks HP on P0.7; if not home, starts the
   carriage (SMCONH bit1) with a step budget and waits for P0.7 to go HIGH (double-read
   debounce), reversing/retrying via 0xD8B6 if the budget runs out, then edge-aligns with
