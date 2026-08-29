@@ -130,3 +130,7 @@ transform.
 - `beep_tone`@6466 (gate-array beeper reg + Timer1 + duration mem_0008/09); presets
   `beep_short`@63ac / `beep_key`@63b7 / `beep_med`@63c2 / `beep_long`@63cd; host BEL = `ctl_BEL`@639A.
 - No power-on beep unless a panel button is held (dispatcher @0x844C calls `beep_key`).
+- `beep_paper_out`@63da: the paper-out alarm, 4 beeps, pause, 4 beeps (duration 0x00CC each,
+  inter-beep gap 0x32 delay units, group gap ~7x that). Checks `panel_read` between groups and
+  aborts with carry set if a button is pressed. Called from the P0.6 paper-end test @0x72DD and
+  the debounced recheck @0xD270.

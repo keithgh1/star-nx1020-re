@@ -23636,8 +23636,9 @@ beep_long:
 lab_63d6:
     jsr beep_tone           ;63d6  20 66 64 
     rts                     ;63d9  60       
+    ;paper-out alarm: 4 beeps, pause, 4 beeps; panel button aborts (carry set)
 
-sub_63da:
+beep_paper_out:
     jsr beep_wait_ready     ;63da  20 5c 64 
     ldm #0xcc,mem_0008      ;63dd  3c cc 08 
     ldm #0x00,mem_0009      ;63e0  3c 00 09 
@@ -26777,7 +26778,7 @@ lab_72dd:
     bbc 6,P0,lab_7310       ;72dd  d7 f6 30 
 
 lab_72e0:
-    jsr sub_63da            ;72e0  20 da 63 
+    jsr beep_paper_out      ;72e0  20 da 63 
     jsr sub_80ad            ;72e3  20 ad 80 
 
 lab_72e6:
@@ -41296,7 +41297,7 @@ sub_c784:
     bbs 7,mem_003c,sub_c784 ;c787  e7 3c fa 
     clb 2,mem_00ce          ;c78a  5f ce    
     jsr sub_d112            ;c78c  20 12 d1 
-    jsr sub_63da            ;c78f  20 da 63 
+    jsr beep_paper_out      ;c78f  20 da 63 
     seb 5,mem_0052          ;c792  af 52    
     seb 3,mem_006d          ;c794  6f 6d    
     seb 2,mem_006d          ;c796  4f 6d    
@@ -43045,7 +43046,7 @@ lab_d27e:
     bbs 7,mem_003c,lab_d27e ;d281  e7 3c fa 
     clb 5,mem_005f          ;d284  bf 5f    
     bbs 5,mem_0056,lab_d28e ;d286  a7 56 05 
-    jsr sub_63da            ;d289  20 da 63 
+    jsr beep_paper_out      ;d289  20 da 63 
     seb 3,mem_006d          ;d28c  6f 6d    
 
 lab_d28e:

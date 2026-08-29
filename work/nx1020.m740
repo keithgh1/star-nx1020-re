@@ -60,6 +60,7 @@ entry 0x63b7 beep_key        "short key/ack beep"
 entry 0x63ac beep_short
 entry 0x63c2 beep_med
 entry 0x63cd beep_long
+entry 0x63da beep_paper_out  "paper-out alarm: 4 beeps, pause, 4 beeps; panel button aborts (carry set)"
 
 # --- dispatchers ---
 entry 0xc2c0 ctrl_lookup
