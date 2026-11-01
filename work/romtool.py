@@ -3,8 +3,8 @@
 NX1020 ROM exploration toolkit.
 
 ROM roles (determined by analysis):
-  ROM1 = UPD27C1001A_DIP32_HN62321APS32_nx1020_ROM1.bin  (128 KB) - font/data ROM
-  ROM2 = AM27C256_DIP28_nx1020_ROM2_ZX32.BIN             (32 KB)  - M50734 firmware
+  ROM1 = nx1020_rom1.ic7       (128 KB) - font/data ROM
+  ROM2 = nx1020_rom2_v3.2.ic6  (32 KB)  - M50734 firmware
 
 CPU: Mitsubishi M50734 (740-family, 6502-derived). External memory mode.
   - Firmware ROM2 maps to 0x8000-0xFFFF (top-aligned).
@@ -23,8 +23,8 @@ import sys, os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-ROM1 = os.path.join(ROOT, "UPD27C1001A_DIP32_HN62321APS32_nx1020_ROM1.bin")
-ROM2 = os.path.join(ROOT, "AM27C256_DIP28_nx1020_ROM2_ZX32.BIN")
+ROM1 = os.path.join(ROOT, "nx1020_rom1.ic7")
+ROM2 = os.path.join(ROOT, "nx1020_rom2_v3.2.ic6")
 
 def load(p): return open(p, "rb").read()
 

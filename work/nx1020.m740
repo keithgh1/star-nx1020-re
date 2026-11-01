@@ -11,8 +11,8 @@
 device M50734
 
 segment ram  0x0000 0x4000  zero
-segment sys  0x4000 0x8000  ../UPD27C1001A_DIP32_HN62321APS32_nx1020_ROM1.bin@0x4000
-segment fw   0x8000 0x10000 ../AM27C256_DIP28_nx1020_ROM2_ZX32.BIN@0x0
+segment sys  0x4000 0x8000  ../nx1020_rom1.ic7@0x4000
+segment fw   0x8000 0x10000 ../nx1020_rom2_v3.2.ic6@0x0
 
 # --- landmarks ---
 entry 0x8130 reset

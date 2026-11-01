@@ -125,12 +125,14 @@ assignment (see [docs/PORT_MAP.md](docs/PORT_MAP.md)).
   users manuals:
 
   ```
-  UPD27C1001A_DIP32_HN62321APS32_nx1020_ROM1.bin   128 KB  font/data ROM  (IC7, mask ROM)
-  AM27C256_DIP28_nx1020_ROM2_ZX32.BIN               32 KB  firmware ROM   (IC6, "*** VER 3.2 ***")
+  nx1020_rom1.ic7         128 KB  font/data ROM  (IC7, HN62321APS32 mask ROM, DIP32)
+  nx1020_rom2_v3.2.ic6     32 KB  firmware ROM   (IC6, AM27C256 EPROM labeled "ZX32", DIP28, "*** VER 3.2 ***")
   ```
 
+  Files are named `<board>_<role>[_<version>].<board location>`, lowercase.
+
   Everything here can be regenerated from the dumps; the labeled listing rebuilds with
-  `m740recon -c work/nx1020.m740 AM27C256_DIP28_nx1020_ROM2_ZX32.BIN > work/rom2_labeled.asm`.
+  `m740recon -c work/nx1020.m740 > work/rom2_labeled.asm` (the control file loads both ROMs).
 
 ## Acknowledgments
 
